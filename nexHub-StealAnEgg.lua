@@ -86,7 +86,7 @@ local HUB_LOGO = "rbxassetid://135199868370962" -- Logo resmi Solana Hub
 local function loadModernV2()
 	local sources = {
 		"https://raw.githubusercontent.com/SolanaHubmy/ggsolana/refs/heads/main/SolanaHub-ModernV2.txt",
-		"https://raw.githubusercontent.com/Soliuse/Solana HubNewUI/refs/heads/main/MainV2.lua",
+		"https://raw.githubusercontent.com/Soliuse/SolanaHubNewUI/refs/heads/main/MainV2.lua",
 	}
 	for _, url in ipairs(sources) do
 		local ok, result = pcall(function()
@@ -1972,10 +1972,10 @@ local randomIdGenerator = Random.new()
 local idChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 local function randomId()
-	local length = randomIdGenerator:SoltInteger(12, 20)
+	local length = randomIdGenerator:NextInteger(12, 20)
 	local chars = table.create(length)
 	for i = 1, length do
-		local pos = randomIdGenerator:SoltInteger(1, #idChars)
+		local pos = randomIdGenerator:NextInteger(1, #idChars)
 		chars[i] = string.sub(idChars, pos, pos)
 	end
 	return table.concat(chars)
@@ -3068,7 +3068,7 @@ do
 
 	state.Shield = function(reason, wanted)
 		shieldRefs[reason] = wanted == true or nil
-		if Solt(shieldRefs) == nil then
+		if next(shieldRefs) == nil then
 			restoreConnections()
 			return
 		end
@@ -3088,7 +3088,7 @@ do
 		restoreConnections()
 		activeShieldMethod = method
 
-		if wasRunning and Solt(shieldRefs) ~= nil then
+		if wasRunning and next(shieldRefs) ~= nil then
 			startShieldLoop()
 		end
 	end
@@ -3906,7 +3906,7 @@ do
 		end
 	end
 
-	if Solt(rarityNames) == nil then
+	if next(rarityNames) == nil then
 		rarityNames = {
 			"Common",
 			"Uncommon",
@@ -3998,7 +3998,7 @@ do
 				end
 			end
 
-			if Solt(newTargets) == nil then
+			if next(newTargets) == nil then
 				for _, areaName in ipairs(areaList) do
 					registerTargetArea(newTargets, areaName)
 				end
@@ -4171,7 +4171,7 @@ do
 
 		local function clearFulfilledRiftNeeds()
 			local riftNeeds = state.Steal.RiftNeeds
-			if not state.Steal.RiftPriority or Solt(riftNeeds) == nil then
+			if not state.Steal.RiftPriority or next(riftNeeds) == nil then
 				return
 			end
 			local owned = collectOwnedCategories()
@@ -4597,8 +4597,8 @@ do
 
 		local ok, serverTime, isNight, SoltNightTime, SoltResetTime = pcall(function()
 			local now = workspace:GetServerTimeNow()
-			local getSoltReset = areaEggCycle.SoltResetTime
-			return now, areaEggCycle.IsNightPhase(now), areaEggCycle.SoltNightTime(now), getSoltReset(now)
+			local getSoltReset = areaEggCycle.GetNextResetTime
+			return now, areaEggCycle.IsNightPhase(now), areaEggCycle.GetNextNightTime(now), getSoltReset(now)
 		end)
 
 		if not ok or type(SoltResetTime) ~= "number" then
@@ -4711,7 +4711,7 @@ local function isFirstAreaCleared()
 	end
 
 	local current = collectFirstAreaUids()
-	if Solt(current) == nil then
+	if next(current) == nil then
 		return true
 	end
 
@@ -4787,7 +4787,7 @@ do
 
 		if type(eggState) == "table" and type(eggState.ReadFieldEggs) == "function" then
 			local ok, result = pcall(eggState.ReadFieldEggs)
-			if ok and type(result) == "table" and type(result.Records) == "table" and Solt(result.Records) ~= nil then
+			if ok and type(result) == "table" and type(result.Records) == "table" and next(result.Records) ~= nil then
 				records = result.Records
 			end
 		end
@@ -4802,7 +4802,7 @@ do
 
 		if not records and state.EspHelpers and type(state.EspHelpers.GetEggSnapshot) == "function" then
 			local ok, cached = pcall(state.EspHelpers.GetEggSnapshot)
-			if ok and type(cached) == "table" and Solt(cached) ~= nil then
+			if ok and type(cached) == "table" and next(cached) ~= nil then
 				records = cached
 			end
 		end
@@ -4861,7 +4861,7 @@ do
 				local info = getAssetInfo(record.AssetCategory)
 				local category = tostring(record.AssetCategory)
 				local passesRarity = info.RarityNumber >= minRarityNumber
-				local passesSpecific = Solt(targetEggCategories) == nil or targetEggCategories[category] == true
+				local passesSpecific = next(targetEggCategories) == nil or targetEggCategories[category] == true
 				local scale = tonumber(record.AssetScale) or 1
 				local eggMutations = {}
 				if type(record.Mutations) == "table" then
@@ -4915,7 +4915,7 @@ do
 			end
 		end
 
-		if Solt(activeUids) ~= nil then
+		if next(activeUids) ~= nil then
 			for uid in pairs(forcedStealQueue) do
 				if not activeUids[uid] then
 					forcedStealQueue[uid] = nil
@@ -8445,8 +8445,8 @@ local function stealTask()
 		lastSkipReason = lastSkipReason or state.SafeCarry.LastSkip
 		state.SafeCarry.LastSkip = nil
 		local defaultNoMatch = state.Steal.RiftPriority
-			and (Solt(state.Steal.RiftNeeds) == nil and "All Lab Eggs collected" or "Waiting for Lab Egg (not spawned yet)")
-			or stealIndexEnabled and (Solt(missingIndexEggs) == nil and "All Index Eggs completed" or "Waiting for Index Egg in selected area")
+			and (next(state.Steal.RiftNeeds) == nil and "All Lab Eggs collected" or "Waiting for Lab Egg (not spawned yet)")
+			or stealIndexEnabled and (next(missingIndexEggs) == nil and "All Index Eggs completed" or "Waiting for Index Egg in selected area")
 			or "No egg matches"
 		stealStatusText = carriedEntry and "Best egg is carried, waiting for it" or lastSkipReason and "Skipped: " .. lastSkipReason or defaultNoMatch
 		return false
@@ -9419,8 +9419,8 @@ do
 			if type(entry) == "table" and entry.Placement == nil and not blockedPlaceUids[uid] then
 				local income = computePlaceIncome(entry)
 				local category = tostring(entry.AssetCategory)
-				local passesRarity = Solt(placeRarityFilter) == nil or placeRarityFilter[getPlaceRarity(entry)] == true
-				local passesSpecific = Solt(placeSpecificFilter) == nil or placeSpecificFilter[category] == true
+				local passesRarity = next(placeRarityFilter) == nil or placeRarityFilter[getPlaceRarity(entry)] == true
+				local passesSpecific = next(placeSpecificFilter) == nil or placeSpecificFilter[category] == true
 				local passesValue = placeMinValue <= 0 or income >= placeMinValue
 
 				if passesRarity and passesSpecific and passesValue then
@@ -9584,7 +9584,7 @@ do
 		end
 
 		for i = #slots, 2, -1 do
-			local j = slotRandom:SoltInteger(1, i)
+			local j = slotRandom:NextInteger(1, i)
 			slots[i], slots[j] = slots[j], slots[i]
 		end
 
@@ -10487,7 +10487,7 @@ do
 			end
 		end
 
-		if Solt(hatchFilter.Eggs) ~= nil and hatchFilter.Eggs[tostring(entry.AssetCategory)] ~= true then
+		if next(hatchFilter.Eggs) ~= nil and hatchFilter.Eggs[tostring(entry.AssetCategory)] ~= true then
 			return false
 		end
 		return true
@@ -10633,7 +10633,7 @@ do
 		local assetDirectory = modules.Assets and modules.Assets.Directory
 		local waitForDirectory = 0
 
-		while (type(assetDirectory) ~= "table" or Solt(assetDirectory) == nil) and waitForDirectory < 2 do
+		while (type(assetDirectory) ~= "table" or next(assetDirectory) == nil) and waitForDirectory < 2 do
 			waitForDirectory = waitForDirectory + task.wait(0.1)
 
 			if type(modules.Assets) ~= "table" then
@@ -11106,7 +11106,7 @@ do
 	end
 
 	local function hasAnyMutation(entry)
-		return type(entry) == "table" and Solt(entry) ~= nil
+		return type(entry) == "table" and next(entry) ~= nil
 	end
 
 	local function getSaveData()
@@ -11680,7 +11680,7 @@ do
 	end
 
 	local function hasAnyMutations(entry)
-		return type(entry) == "table" and Solt(entry) ~= nil
+		return type(entry) == "table" and next(entry) ~= nil
 	end
 
 	local function formatFuseValue(value)
@@ -11712,7 +11712,7 @@ do
 			and not equippedSet[uid]
 			and not equippedSet[tostring(uid)]
 			and getFuseRarityNumber(item.Category) <= fuseMaxRarity
-			and (Solt(fuseSpeciesFilter) == nil or fuseSpeciesFilter[tostring(item.Category)] == true)
+			and (next(fuseSpeciesFilter) == nil or fuseSpeciesFilter[tostring(item.Category)] == true)
 
 		if isCandidate then
 			isCandidate = not (fuseSkipMutated and hasAnyMutations(item.Mutations))
@@ -13116,7 +13116,7 @@ do
 				if type(item) == "table" and item.InFuse ~= true then
 					local cat = item.Category or item.AssetCategory or item.Name or item.DisplayName
 					if cat ~= nil then
-						local isMut = (type(item.Mutations) == "table" and Solt(item.Mutations) ~= nil)
+						local isMut = (type(item.Mutations) == "table" and next(item.Mutations) ~= nil)
 							or item.Mutation ~= nil or item.BaseMutation ~= nil
 						seenUids[uid] = true
 						table.insert(candidates, {
@@ -13143,7 +13143,7 @@ do
 					if uid and not seenUids[uid] then
 						local cat = item.AssetCategory or item.Category or item.Name or item.DisplayName
 						if cat ~= nil then
-							local isMut = (type(item.Mutations) == "table" and Solt(item.Mutations) ~= nil)
+							local isMut = (type(item.Mutations) == "table" and next(item.Mutations) ~= nil)
 								or item.Mutation ~= nil or item.BaseMutation ~= nil
 							seenUids[uid] = true
 							table.insert(candidates, {
@@ -13174,7 +13174,7 @@ do
 						if uid and not seenUids[uid] then
 							local cat = item.AssetCategory or item.Category or item.Name or item.DisplayName
 							if cat ~= nil then
-								local isMut = (type(item.Mutations) == "table" and Solt(item.Mutations) ~= nil)
+								local isMut = (type(item.Mutations) == "table" and next(item.Mutations) ~= nil)
 									or item.Mutation ~= nil or item.BaseMutation ~= nil
 								seenUids[uid] = true
 								table.insert(candidates, {
@@ -13791,11 +13791,11 @@ do
 			end
 		end
 
-		if favoriteAnyMutation or Solt(favoriteMutationSet) ~= nil then
+		if favoriteAnyMutation or next(favoriteMutationSet) ~= nil then
 			checks = checks + 1
 			local itemMutations = collectMutations(item)
 
-			if favoriteAnyMutation and Solt(itemMutations) ~= nil then
+			if favoriteAnyMutation and next(itemMutations) ~= nil then
 				matches = matches + 1
 			else
 				local hasMatch = false
@@ -15177,7 +15177,7 @@ do
 	end
 
 	_df.scanForDroneMap = function()
-		if droneScanCache and Solt(droneScanCache) ~= nil then
+		if droneScanCache and next(droneScanCache) ~= nil then
 			return droneScanCache
 		end
 		droneScanCache = nil
@@ -15196,7 +15196,7 @@ do
 					if ok2 and type(upvalues) == "table" then
 						for _, upvalue in pairs(upvalues) do
 							if type(upvalue) == "table" then
-								local _, first = Solt(upvalue)
+								local _, first = next(upvalue)
 								if type(first) == "table" and first.OwnerUserId ~= nil and first.CFrame ~= nil then
 									droneScanCache = upvalue
 									return upvalue
@@ -16171,7 +16171,7 @@ do
 		local serverTime = workspace:GetServerTimeNow()
 		local windowActive, remaining = isEventWindowActive()
 		if windowActive and remaining and remaining < 25 then
-			return Solt(dropMap) ~= nil
+			return next(dropMap) ~= nil
 		end
 
 		for _, drop in pairs(dropMap) do
@@ -16213,7 +16213,7 @@ do
 
 			local drone = _df.findNearestDrone()
 
-			if not drone and Solt(dropMap) ~= nil then
+			if not drone and next(dropMap) ~= nil then
 				_df.collectDrops(cancelledFn)
 				_df.refreshDroneMapFromVisuals()
 				drone = _df.findNearestDrone()
@@ -16403,7 +16403,7 @@ do
 			return true
 		end
 		_df.refreshDroneMapFromVisuals()
-		return #_df.collectAliveDrones() > 0 or Solt(dropMap) ~= nil
+		return #_df.collectAliveDrones() > 0 or next(dropMap) ~= nil
 	end
 
 	isHuntNeeded = function()
@@ -16931,7 +16931,7 @@ end
 				filtered = true
 			end
 
-			if not filtered and Solt(mutationContext.Targets) ~= nil and mutationContext.Targets[tostring(entry.AssetCategory)] ~= true then
+			if not filtered and next(mutationContext.Targets) ~= nil and mutationContext.Targets[tostring(entry.AssetCategory)] ~= true then
 				filtered = true
 			end
 
@@ -19054,7 +19054,7 @@ do
 					end)
 				end
 			end
-		elseif Solt(savedHoldDurations) ~= nil or childAddedConnection then
+		elseif next(savedHoldDurations) ~= nil or childAddedConnection then
 			restorePromptHolds()
 		end
 
@@ -21639,7 +21639,7 @@ do
 	local function fetchEggSnapshot()
 		local version = eggEspRenderVersion
 
-		if eggRecordsCache and Solt(activeEggRows) == nil then
+		if eggRecordsCache and next(activeEggRows) == nil then
 			scheduleEggRender()
 		end
 		local eggState = modules.EggState
@@ -21686,7 +21686,7 @@ do
 						}
 					end
 				end
-				if Solt(synthetic) then
+				if next(synthetic) then
 					records = synthetic
 				end
 			end
@@ -23401,7 +23401,7 @@ do
 			candidates = filterServers(1)
 		end
 
-		if #candidates == 0 and Solt(blockedServers) ~= nil then
+		if #candidates == 0 and next(blockedServers) ~= nil then
 			table.clear(blockedServers)
 			candidates = filterServers(1)
 		end
