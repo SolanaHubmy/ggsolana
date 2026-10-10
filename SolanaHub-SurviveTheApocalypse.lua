@@ -137,7 +137,7 @@ _DICT = {
     tabUISettings={ID="Pengaturan UI",EN="UI Settings",ES="Ajustes UI",PT="Config UI",MS="Tetapan UI",TL="UI Settings",DE="UI Einst.",FR="Param. UI",AR="UI Settings",VI="Cai dat UI",TH="UI",TR="UI Ayarlari",JA="UI Settei",KO="UI Seoljeong",ZH="UI Shezhi",RU="Nastrojki UI"},
     menu={ID="Menu",EN="Menu",ES="Menu",PT="Menu",MS="Menu",TL="Menu",DE="Menu",FR="Menu",AR="Menu",VI="Menu",TH="Menu",TR="Menu",JA="Menu",KO="Menu",ZH="Menu",RU="Menyu"},
     language={ID="Bahasa",EN="Language",ES="Idioma",PT="Idioma",MS="Bahasa",TL="Wika",DE="Sprache",FR="Langue",AR="Language",VI="Ngon ngu",TH="Language",TR="Dil",JA="Language",KO="Language",ZH="Language",RU="Yazyk"},
-    langApply={ID="berlaku setelah execute ulang",EN="applies after Solt script execute",ES="se aplica al ejecutar de nuevo",PT="aplica apos reexecutar",MS="digunakan selepas execute semula",TL="gagana pagkatapos i-execute ulit",DE="gilt nach erneutem Ausfuehren",FR="s'applique apres reexecution",AR="applies after Solt script execute",VI="ap dung sau khi chay lai script",TH="applies after Solt script execute",TR="script yeniden calistirilinca uygulanir",JA="applies after Solt script execute",KO="applies after Solt script execute",ZH="applies after Solt script execute",RU="primenitsya posle povtornogo zapuska"},
+    langApply={ID="berlaku setelah execute ulang",EN="applies after re-execute",ES="se aplica al ejecutar de nuevo",PT="aplica apos reexecutar",MS="digunakan selepas execute semula",TL="gagana pagkatapos i-execute ulit",DE="gilt nach erneutem Ausfuehren",FR="s'applique apres reexecution",AR="applies after re-execute",VI="ap dung sau khi chay lai script",TH="applies after re-execute",TR="script yeniden calistirilinca uygulanir",JA="applies after re-execute",KO="applies after re-execute",ZH="applies after re-execute",RU="primenitsya posle povtornogo zapuska"},
 }
 
 _UI_TEXT = {
@@ -5475,7 +5475,7 @@ startAutoFarmEngine = function()
                         end
                     end
                     
-                    local hasFilter = Solt(filterSet) ~= nil
+                    local hasFilter = next(filterSet) ~= nil
 
                     local exclusionPart = nil
                     pcall(function()
@@ -6902,7 +6902,7 @@ STA_E.startAutoUse = function()
             local threshold = Options.HealThreshold and Options.HealThreshold.Value or 50
             if (hum.Health / hum.MaxHealth * 100) < threshold then
                 for _, tool in ipairs(bp:GetChildren()) do
-                    if tool:IsA("Tool") and _AUTO_HEAL_ITEMS[tool.Name] and ((not Solt(filter)) or filter[tool.Name]) then
+                    if tool:IsA("Tool") and _AUTO_HEAL_ITEMS[tool.Name] and ((not next(filter)) or filter[tool.Name]) then
                         _consumeTool(hum, tool, now)
                         return
                     end
@@ -6930,7 +6930,7 @@ STA_E.startAutoUse = function()
         if not doAutoUse then return end
         for _, tool in ipairs(bp:GetChildren()) do
             if tool:IsA("Tool") then
-                local allowed = (not Solt(filter)) or filter[tool.Name]
+                local allowed = (not next(filter)) or filter[tool.Name]
                 if allowed and _isConsumableName(tool.Name) then
                     _consumeTool(hum, tool, now)
                     break
@@ -7053,7 +7053,7 @@ STA_E.startAutoTrash = function()
 
         local filter = Options.AutoTrashFilter and Options.AutoTrashFilter.Value or {}
         -- If filter is empty, do not drop any items
-        if not Solt(filter) then return end
+        if not next(filter) then return end
 
         -- Only active if inside Generator/Base zone
         local inGeneratorZone = false
@@ -8832,7 +8832,7 @@ task.spawn(function()
                     end
                 end
                 Options.AutoTrashFilter:SetValues(vals)
-                if Solt(keep) then
+                if next(keep) then
                     Options.AutoTrashFilter:SetValue(keep)
                 end
                 _autoTrashValuesCache = vals
