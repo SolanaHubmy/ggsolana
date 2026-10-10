@@ -99,7 +99,7 @@ if ModernV2 and ModernV2.CreateMenuIcon then
         Draggable = true,
     })
 end
-l   ocal Window
+local Window
 if ModernV2 then
     -- =====================================
     -- MAIN SCRIPT
