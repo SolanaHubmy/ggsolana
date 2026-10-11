@@ -1,0 +1,3232 @@
+--[[
+    SolanaHub · Fisch
+    UI: ModernV2
+    Toggle: RightShift
+]]
+
+repeat task.wait() until game:IsLoaded()
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local CollectionService = game:GetService("CollectionService")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local ModernV2 = loadstring(game:HttpGet("https://raw.githubusercontent.com/nexiuse/NexHubNewUI/refs/heads/main/MainV2.lua"))()
+
+local SH = {}
+local ACCENT = Color3.fromRGB(220, 35, 55)
+local LOGO = "135199868370962"
+
+-- =====================================================
+-- CONFIG
+-- =====================================================
+SH.Config = {
+    AutoCast = false, AutoShake = false, ShakeDelay = 300, InstantBobber = false,
+    AutoEquip = false, Mode = "Legit",
+
+    SnapReel = false, SnapFishName = "None", SnapShinyType = "None",
+    SnapMutation = "None", SnapRarity = "None",
+
+    AutoSell = false, SellInterval = 5, AutoSpear = false, AutoSpearLocation = "Lost Jungle",
+
+    AutoTotem = false, TotemDay = "None", TotemNight = "None", TotemDelay = 60, TotemActive = false,
+    AutoBuyTotem = false, SelectedTotem = "Sundial Totem", TotemInterval = 5,
+
+    AutoAppraise = false, ShinyType = "None", TargetSize = "None", TargetMutation = "None",
+
+    AutoFavorite = false, AutoSellSelected = false, SellSelectedRarity = "None", SellSelectedName = "None",
+    AutoEnchant = false, SelectedRelic = "Enchant Relic", TargetEnchant = "Hasty",
+
+    AutoCosmicRelic = false, AutoFlower = false, AutoShell = false, AutoChest = false,
+    AutoCrabDeploy = false, AutoCrabClaim = false, AutoMerlin = false, AutoAngler = false,
+    AutoUsePotion = false, SelectedPotion = "None", AutoUseFood = false, SelectedFood = "None",
+
+    SelectedRod = "Flimsy Rod", SelectedShopItem = "Bait Crate", BuyItemAmount = 1,
+
+    SelectedLoc = nil,
+
+    Fly = false, FlySpeed = 50, Noclip = false, InfiniteJump = false,
+    WalkspeedEnabled = false, WalkspeedValue = 20, AntiSwim = false,
+
+    FullBright = false, PotatoMode = false, PlayerESP = false, NPCESP = false,
+
+    AntiStaff = false, HideMinigameUI = false, BypassGPS = false,
+    AutoFriend = false, CensorUsername = false, AvatarTarget = "",
+
+    WebhookEnabled = false, WebhookURL = "", WebhookDelay = 3,
+    WebhookDiscordID = "", WebhookMentions = false, WebhookLastSent = 0,
+
+    HideIdentity = false, CustomName = "Player", CustomLevel = "Level: 999",
+    PrivateServerJobId = "", BlackScreen = false, WhiteScreen = false,
+}
+local C = SH.Config
+
+-- =====================================================
+-- RUNTIME STATE
+-- =====================================================
+SH.Toggles = {}
+SH.State = {
+    BobberProcessed = {}, FavDone = {},
+    StorageActive = false, StarCraterActive = false,
+    StorageFilter = { Name = "None", Rarity = "None", Mutation = "None" },
+    ServerFinderCache = {}, ServerFinderFilter = "",
+    StorageDataController = nil,
+    SpearRemote = nil, SellEvent = nil, RemoteShake = nil,
+    IdentityOriginalName = "", IdentityOriginalLevel = "", IdentitySaved = false,
+    CensorOriginal = nil, OrigLighting = nil,
+    FlyBV = nil, FlyBG = nil, FlyConn = nil,
+    NoclipConn = nil, JumpConn = nil, WalkspeedConn = nil, AntiSwimConn = nil,
+    WowConn = nil, WaterPart = nil, AntiAFKConn = nil,
+    FreezeConn = nil, FrozenCFrame = nil,
+    ScreenSaverGui = nil, AntiStaffConn = nil, HideMGConn = nil,
+    FriendConn = nil, RadarLoop = nil,
+}
+local S = SH.State
+
+-- =====================================================
+-- DATA
+-- =====================================================
+SH.Data = {}
+local D = SH.Data
+
+D.RarityList = {
+    "None", "Trash", "Common", "Uncommon", "Unusual", "Rare",
+    "Legendary", "Mythical", "Divine", "Exotic", "Secret",
+    "Relic", "Fragment", "Limited", "Apex", "Extinct", "Cataclysmic",
+}
+D.ShinyOptions = { "None", "Shiny", "Sparkling", "Shiny + Sparkling" }
+
+D.TotemOptions = {
+    "None", "Sundial Totem", "Tempest Totem", "Windset Totem", "Clearcast Totem",
+    "Smokescreen Totem", "Aurora Totem", "Meteor Totem", "Avalanche Totem",
+    "Eclipse Totem", "Blizzard Totem", "Zeus Storm Totem", "Poseidon Wrath Totem",
+    "Blue Moon Totem", "Shiny Totem", "Sparkling Totem", "Mutation Totem",
+    "Starfall Totem", "Rainbow Totem", "Megalodon Hunt Totem", "Kraken Hunt Totem",
+    "Colossal Dragon Hunt Totem", "Scylla Hunt Totem", "Dripstone Collapse Totem",
+}
+D.TotemPrices = {
+    ["Sundial Totem"] = "2,000C$", ["Tempest Totem"] = "2,000C$",
+    ["Windset Totem"] = "2,000C$", ["Smokescreen Totem"] = "2,000C$",
+    ["Meteor Totem"] = "75,000C$", ["Eclipse Totem"] = "200,000C$",
+    ["Aurora Totem"] = "500,000C$",
+}
+D.TotemListBuy = {}
+for name in pairs(D.TotemPrices) do table.insert(D.TotemListBuy, name) end
+table.sort(D.TotemListBuy)
+
+D.MutationList = {
+    "None", "Albino", "Darkened", "Negative", "Glossy", "Translucent",
+    "Lunar", "Electric", "Silver", "Hexed", "Frozen", "Mosaic", "Scorched",
+    "Amber", "Abyssal's Poisoned", "Fossilized", "Vined", "Crimson", "Midas", "Boreal",
+    "Spirit", "Greedy", "Mythical", "Mourned", "Shrouded", "Coral", "Fallen",
+}
+D.DetectionList = {}
+for _, v in ipairs(D.MutationList) do table.insert(D.DetectionList, v) end
+table.sort(D.DetectionList, function(a, b) return #a > #b end)
+
+D.EnchantsData = {
+    ["Enchant Relic"] = {
+        "Abyssal", "Blessed", "Blessed Song", "Blood Reckoning", "Breezed", "Chaotic",
+        "Chronos", "Clever", "Controlled", "Cupid", "Divine", "Eerie", "Flashline",
+        "Fractured", "Frightful", "Ghastly", "Gingerbread", "Greed", "Hasty", "Hunter",
+        "Insight", "Long", "Lucky", "Merry", "Momentum", "Mutated", "Noir", "Peppermint",
+        "Pharaohs Curse", "Putrid", "Quality", "Rage", "Resilient", "Santa", "Scavenger",
+        "Scrapper", "Sea King", "Spooky", "Steady", "Storming", "Swift", "Unbreakable",
+        "Valentine's", "Weak", "Wobbly", "Wormhole",
+    },
+    ["Exalted Relic"] = {
+        "Anomalous", "Ferocious", "Herculean", "Immortal", "Invincible",
+        "Mystical", "Piercing", "Quantum", "Sea Overlord",
+    },
+    ["Cosmic Relic"] = {
+        "Cryogenic", "Glittered", "Overclocked", "Sea Prince",
+        "Tenacity", "Tryhard", "Vicious", "Wise",
+    },
+    ["Twisted Relic"] = {
+        "Rage", "Greed", "Fractured", "Putrid", "Pharaohs Curse", "Weak", "Wobbly",
+    },
+}
+D.SecondaryRelics = { ["Cosmic Relic"] = true, ["Twisted Relic"] = true }
+D.RelicNames = { "Enchant Relic", "Exalted Relic", "Cosmic Relic", "Twisted Relic" }
+
+D.RodList = {
+    "Abyssal Specter Rod", "Adventurer's Rod", "Arctic Rod", "Astralhook Rod", "Aurora Rod", "Blazebringer Rod",
+    "Carbon Rod", "Carrot Rod", "Celestial Rod", "Cerulean Fang Rod", "Challenger's Rod", "Champions Rod",
+    "Christmas Tree Rod", "Dave Rod", "Depthseeker Rod", "Destiny Rod", "Developers Rod", "Dusekkar Rod",
+    "Eidolon Rod", "Ethereal Prism Rod", "Fabulous Rod", "Firefly Rod", "Flimsy Rod", "Free Spirit Rod",
+    "Frog Rod", "Great Dreamer Rod", "Great Rod of Oscar", "Haunted Rod", "Heaven's Rod", "Kings Rod",
+    "Kraken Rod", "Leviathan's Fang Rod", "Long Rod", "Lucky Rod", "Magma Rod", "Magnet Rod", "Midas Rod",
+    "Mythical Rod", "No-Life Rod", "Paper Fan Rod", "Pen Rod", "Phoenix Rod", "Popsicle Rod", "Poseidon Rod",
+    "Precision Rod", "Rainbow Cluster Rod", "ReRod", "Reinforced Rod", "Resourceful Rod", "Riptide Rod",
+    "Rod Of The Depths", "Rod Of The Eternal King", "Rod Of The Exalted One", "Rod Of The Forgotten Fang",
+    "Rod Of The Zenith", "Santa's Miracle Rod", "Scurvy Rod", "Seraphic Rod", "Silly Fun Happy Rod",
+    "Steady Rod", "Summit Rod", "Sunken Rod", "Tempest Rod", "The Lost Rod", "Training Rod", "Trident Rod",
+    "Tryhard Rod", "Verdant Shear Rod", "Vineweaver Rod", "Volcanic Rod", "Voyager Rod", "Wildflower Rod",
+    "Wisdom Rod", "Zeus Rod",
+}
+table.sort(D.RodList)
+
+D.EventList = {
+    "Baby Bloop Fish", "Bloop Fish", "Whales Pool", "Orcas Pool",
+    "The Kraken Pool", "Animal Pool", "Plesiosaur Hunt", "Goldwraith Hunt",
+    "Reef Titan Hunt", "Sunken Reliquary", "Omnithal Hunt",
+    "Animal Pool - Second Sea", "Octophant Pool Without Elephant",
+    "Sea Leviathan Pool", "Isonade", "Forsaken Veil - Scylla",
+    "Blue Moon - Second Sea", "Blue Moon - First Sea", "Great White Shark",
+    "LEGO", "LEGO - Studolodon", "Skeletal Leviathan Hunt", "Pliosaur Hunt",
+    "Toxic Boil", "Flower Guardian Hunt", "Rotbloom Hunt", "Ancient Depth Serpent",
+    "The Depths - Serpent", "Mosslurker", "Narwhal", "Whale Shark",
+    "Birthday Megalodon", "Colossal Blue Dragon", "Colossal Ancient Dragon",
+    "Colossal Ethereal Dragon", "Megalodon Ancient", "Megalodon Default",
+    "Megalodon Phantom",
+}
+
+D.SnapFishList = {
+    "None",
+    "Abyss Dart","Abyss Flicker","Abyss Snapper","Abyssacuda","Abyssal Bearded Seadevil",
+    "Abyssal Devourer","Abyssal Goliath","Abyssal Grenadier","Abyssal King","Abyssal Maw",
+    "Abyssal Slickhead","Abyssborn Monstrosity","Acanthodii","Aetherfin","Akkorokamui",
+    "Algae Lurker","Alligator","Alligator Gar","Amberjack","Amblypterus","Anchovy",
+    "Ancient Depth Serpent","Ancient Eel","Ancient Kraken","Ancient Megalodon","Ancient Orca",
+    "Angelfish","Anglerfish","Anomalocaris","Antarctic Icefish","Apex Leviathan","Aqua Scribe",
+    "Arapaima","Arctic Char","Armorhead","Ashclaw","Ashcloud Archerfish","Ashscale Minnow",
+    "Atlantean Alchemist","Atlantean Anchovy","Atlantean Guardian","Atlantean Sardine",
+    "Atlantic Goliath Grouper","Atlantic Halosaur","Atolla Jellyfish","Aurora Trout","Axolotl",
+    "Azure Prowler","Baby Bloop Fish","Baby Pond Emperor","Banditfish","Barbed Shark",
+    "Barracuda","Barreleye Fish","Basalt Loach","Basalt Pike","Batfish","Bauble Bass",
+    "Beach Ball Pufferfish","Bearded Toadfish","Bellfin","Beluga","Bigeye Houndshark",
+    "Bigeye Trevally","Bigfin Squid","Birgeria","Birthday Dumbo Octopus","Birthday Goldfish",
+    "Birthday Megalodon","Birthday Squid","Black Dragon Fish","Black Ghost Knifefish",
+    "Black Grouper","Black Scabbardfish","Black Snoek","Black Swallower","Black Veil Ray",
+    "Blackfin Barracuda","Blackfish","Blackmouth Catshark","Blackspot Tuskfish","Blazebelly",
+    "Blind Swamp Eel","Blisterback Blenny","Blistered Eel","Blisterfish","Blobfish",
+    "Bloodscript Eel","Bloomtail","Bloop Fish","Blue Foamtail","Blue Langanose",
+    "Blue Ribbon Eel","Blue Tang","Blue Whale","Bluefin Tuna","Bluefish","Bluegem Angelfish",
+    "Bluegill","Bluehead Wrasse","Bluelip Batfish","Boarfish","Bog Lantern Goby","Bogscale",
+    "Bone Lanternfish","Bowfin","Brackscale","Breaker Moth","Bream","Brimstone Angler",
+    "Brine Phantom","Brine Sovereign","Bronze Corydoras","Buccaneer Barracuda","Bull Shark",
+    "Bumpy Snailfish","Burbot","Burnt Betta","Butterflyfish","Candle Carp","Candy Cane Carp",
+    "Candy Cane Cod","Candy Fish","Canopy Tetra","Capybass","Cardinal Tetra","Carol Carp",
+    "Carp","Carrot Eel","Carrot Goldfish","Carrot Minnow","Carrot Pufferfish","Carrot Salmon",
+    "Carrot Shark","Carrot Snapper","Carrot Turtle","Cataclysm Carp","Catfish","Cathulid",
+    "Cathulith","Caustic Starwyrm","Cave Angel Fish","Cave Loach","Celestial Koi","Charybdis",
+    "Chasm Leech","Chillback Whitefish","Chillfin Chimaera","Chillfin Herring","Chillshadow Chub",
+    "Chinfish","Chinook Salmon","Chronos Deep Swimmer","Chub","Cinder Carp","Cinder Dart",
+    "Cindercoil Eel","Cladoselache","Clout Carp","Clowned Triggerfish","Clownfish","Cluckfin",
+    "Coalfin Darter","Cobalt Angelfish","Cobia","Cockatoo Squid","Cod","Coelacanth",
+    "Coffin Crab","Coin Piranha","Coin Squid","Coin Triggerfish","Colossal Carp",
+    "Colossal Saccopharynx","Colossal Squid","Column Crawler","Coney Grouper","Confetti Carp",
+    "Confetti Shark","Cookiecutter Shark","Copper Rockfish","Coral Chromis","Coral Emperor",
+    "Coral Guard","Coral Turkey","Cornetfish","Corsair Grouper","Countdown Perch","Crag-Crab",
+    "Cragscale","Crawling Angler","Crescent Madtom","Crestscale","Crocokoi","Crown Bass",
+    "Crowned Anglerfish","Crowned Royal Gramma","Crustal Colossus","Cryo Coelacanth",
+    "Cryoshock Serpent","Cryoskin","Crystal Chorus","Crystal Corydoras","Crystal Frilled Shark",
+    "Crystal Wrasse","Crystallized Seadragon","Cupid Crab","Cursed Eel","Cusk Eel",
+    "Cutlass Fish","Cyclone Mako","Cyclone Scorpionfish","Dasyatis","Deep Behemoth",
+    "Deep Crownfish","Deep Emperor","Deep Freeze Devilfish","Deep One","Deep-sea Dragonfish",
+    "Deep-sea Hatchetfish","Deeplight Footballfish","Deepwater Stingray","Depth Drifter",
+    "Depth Lurker","Depth Octopus","Diamond Discus","Diplomystus","Diplurus","DJ Spinopus",
+    "Doctorfish Tang","Dogefin","Dolphin","Dreaming Aberration","Drift Claw","Driftfin",
+    "Drifting Gildfin","Duckfin Tuna","Dumbo Octopus","Dunkleosteus","Dweller Catfish",
+    "Echo Fisher","Echo Koi","Ectoplasm Eel","Edestus","Eel","Eelpout","Eldritch Horror",
+    "Eldritch Spineback","Electric Eel","Elf Eel","Emerald Angelfish","Emerald Elephantnose",
+    "Emperor Angelfish","Emperor Jellyfish","Eonshell","Escolar","Eternal Frostwhale",
+    "Fangborn Gar","Fangtooth","Firecrest","Flamangler","Flamekissed Hawkfish","Flounder",
+    "Flying Fish","Flying Gurnard","Foamrunner","Fogstripe","Forbidden Plesiosaur",
+    "Forsaken Algae","Four Eyes Fish","Fourhorn Sculpin","Frankenshrimp","French Grunt",
+    "Freshwater Pacu","Frigid Shrimp","Frilled Shark","Frost Minnow","Frost Ray",
+    "Frostbite Flounder","Frostjaw Cod","Frostling Goby","Frostscale Fangtooth","Frosty Turkey",
+    "Frozen Leviathan","Frozen Pike","Fruitcake Flounder","Furnace Leaper","Gale Snapper",
+    "Galleon Goliath","Garra Andruzzii","Garra Typhlops","Gazerfish","Gem Anchovy","Gem Blobfish",
+    "Gem Dolphin","Gem Eel","Gem Marlin","Gem Salmon","Gemscale Mandarinfish",
+    "Gemstone Whale Shark","Ghost Minnow","Ghost Turkey","Ghoulfish","Giant Grouper",
+    "Giant Lamprey","Giant Manta","Giant Moray","Giant Seadevil","Gillicus","Gingerbread Fish",
+    "Ginsu Shark","Glacial Squid","Glacial Sturgeon","Glacier Pike","Glacier Swordfish",
+    "Glacierfish","Glade Lurker","Glassfish","Glimmer Guppy","Gloamfin Gar","Globefish",
+    "Gloombiter","Glowfin Skipper","Gnomefish","Goblin Shark","Goldband Butterflyfish",
+    "Golden Dorado","Golden Seahorse","Golden Smallmouth Bass","Goldfin Octopus","Goldfish",
+    "Goliath Tigerfish","Gollum Snakehead","Gorgon Grouper","Grand Reef Guardian",
+    "Gravestone Stingray","Grayling","Great Barracuda","Great Goldcursed Shark",
+    "Great Hammerhead Shark","Great White Shark","Greater Weever","Greenland Halibut",
+    "Grey Carp","Gudgeon","Gulf Toadfish","Gust Tail","Haddock","Halibut","Hallucigenia",
+    "Handfish","Harbinger Koi","Hawaiian Bobtail Squid","Heartbreak Herring","Helicoprion",
+    "Helios Ray","Hellfire Haddock","Hellmaw Eel","Herring","Hexeye Snapper","Hidden Filefish",
+    "Hidden Pipefish","Hogchoker","Hollow Gazer","Hollow Snapper","Hollowfin","Holly Haddock",
+    "Horizon Tetra","Hot Cocoa","Hourglass Bass","Hydra Haddock","Hyneria","Ice Anchovy",
+    "Ice Eel","Ice Jellyfish","Ice Octopus","Icebeard Shark","Icebreaker Haddock","Iced Perch",
+    "Icefang Barracuda","Icy Carp","Icy Daggerfish","Icy Goldfish","Icy Salmon","Icy Tuna",
+    "Icy Walleye","Infant Giant Seadevil","Infernal Iguanafish","Infernal Isonade",
+    "Inferno Chaser","Islandhopper Butterflyfish","Isonade","Japanese Dragon Eel","Jellystud",
+    "John Dory","Jungle Phantom","Jurassic Helicoprion","Kelpie","King Jellyfish",
+    "Kissing Gourami","Kitefin Shark","Kittyfish","Knifefish","Krabbit","Kraken Koi",
+    "Lagoon Dart","Lake Whitefish","Lantern Snapper","Lanternfish","Lapisjack","Largemouth Bass",
+    "Lava Bream","Lava Lamprey","Leedsichthys","Lepidotes","Leviathan","Leviathan Bass",
+    "Leviathan Humpback Anglerfish","Lightning Minnow","Lightning Pike","Lingcod","Long Pike",
+    "Longnose Chimaera","Longtail Bass","Lost Turkey","Lovestorm Eel","Lovestorm Eel Supercharged",
+    "Lovestorm Turtle","Lovestorm Turtle Supercharged","Lumilotl","Luminescent Minnow",
+    "Lumpclinger","Lunar Monkfish","Lurkerfish","Lurking Crescent Pike","Lusca","Mackerel",
+    "Maelstorm Shark","Mage Marlin","Magician Narwhal","Magma Leviathan","Magma Pike",
+    "Magma Tang","Magma Turkey","Magmatic Hermit Crab","Mahi Mahi","Mained Lionfish","Manatee",
+    "Mandarinfish","Manta Ray","Marble Maiden","Marsh Gar","Massive Marlin","Megalodon",
+    "Merry Manta Ray","Mexican Tetra","Midnight Axolotl","Minnow","Minnowse","Mirage Toadfish",
+    "Mistletoe Minnow","Molten Banshee","Molten Minnow","Molten Moray","Molten Ripple",
+    "Molten Serpent","Moltenstripe","Moon Arctic Char","Moonfish","Moonridge Catfish",
+    "Moonveil Killifish","Mosaic Swimmer","Mosasaurus","Mosslurker","Mossy Turkey",
+    "Mourning Manta Ray","Mullet","Murkdrifter","Murkfin","Murkslither","Murky Turkey",
+    "Mutated Shark","Mythic Fish","Napoleonfish","Narwhal","Nautilus","Neon Tetra","Nessie",
+    "Net Wolffish","Northstar Serpent","Northstar Whale","Nurse Shark","Nutcracker Catfish",
+    "Oak Stripetail","Oarfish","Obsidian Koi","Obsidian Ray","Obsidian Salmon","Obsidian Swordfish",
+    "Ocean Triggerfish","Octophant","Oilfish","Olm","Olmdeer","Onychodus","Opalescent Catfish",
+    "Orca","Orcanda","Oreochima","Ornament Fish","Ornament Pufferfish","Oyster toadfish",
+    "Ozark Cavefish","Palaeoniscum","Pale Ghost Lumpfish","Pale Tang","Paradox Piranha",
+    "Parktail Spinesnapper","Parrotfish","Party Popperfish","Party Pufferfish","Payara",
+    "Pelagic Cod","Pelican Eel","Pengwhal","Peppermint Pike","Perch","Phanerorhynchus",
+    "Phantom Brine","Phantom Jellyfish","Phantom Koi","Phantom Megalodon","Phantom Ray",
+    "Piglet Pike","Pike","Pine Zephyrfish","Pink Betta","Pioneer Turkey","Piranha","Piranhamunk",
+    "Pirarucu","Pirate Turkey","Polar Alligator","Polar Cod","Polar Prowler","Pollock",
+    "Pond Emperor","Porcufish","Porcupinefish","Porgy","Poseidon Turkey","Potion Perch",
+    "Primordial Levi","Prismatic Parrotfish","Profane Leviathan","Profane Ray","Psychedelic Frogfish",
+    "Pufferfish","Pufferflute","Pumpkin Pufferfish","Pumpkinseed","Pupfish","Pyre Fang",
+    "Pyrite Pufferfish","Pyro Pike","Pyrogrub","Quartzfin Queenfish","Queen Angelfish",
+    "Rabbitfish","Racuda","Radiant Triplewart Seadevil","Rainbow Grouper","Razorfin","Red Drum",
+    "Red Fangtooth","Red Snapper","Red Tang","Redeye Bass","Redeye Piranha","Redwood Duskray",
+    "Reed Striker","Reef Goby","Reef Minnow","Reef Parrotfish","Reefdart","Reefrunner Snapper",
+    "Regal Angelfish","Reindeer Ray","Rhizodus","Ribbon Eel","Ringle","Ripple Spine",
+    "Rock Gunnel","Rock Hind","Rose Rockfish","Rotfin Eel","Rotjaw","Roughhead Grenadier",
+    "Roundnose Grenadier","Royal Tigerfish","Ruby Lionfish","Ruby Rasbora","Sacred Lovestorm Turtle",
+    "Saffron Cod","Sailfish","Salmon","Salmoose","Sand Tiger Shark","Sandslasher","Santa Pufferfish",
+    "Santa Salmon","Santa Whale Shark","Sapphire Stargazer","Sarcastic Fringehead","Sardine",
+    "Sawfish","Scalding Swordfish","Scalloped Hammerhead","Scaly Dragonfish","Scooty Salmon",
+    "Scorchray","Scoria Swordfish","Scrawled Filefish","Screaming Fluke","Scurvy Sailfish","Scylla",
+    "Sea Bass","Sea Leviathan","Sea Pickle","Sea Raven","Sea Snake","Sea Turtle","Seacow",
+    "Searfin","Sergeant Major","Serpent Surgeonfish","Shadowfang Snapper","Shimmering Silverside",
+    "Shipwreck Barracuda","Shiverfin Haddock","Shortfin Mako Shark","Shrimpanzee","Silver Roughy",
+    "Silver Scuttler","Sinocyclocheilus","Siren Sculpin","Siren Sheep","Siren Singer","Sixgill Shark",
+    "Skelefish","Skeletal Leviathan","Skeletal Nessie","Skipjack Tuna","Slag","Slain Maw",
+    "Slate Tuna","Slate Turkey","Sloane's Viperfish","Slurpfloth","Small Spine Chimera",
+    "Small-Spotted Catshark","Smallmouth Bass","Smeltjaw Snapper","Smogfish","Smolderfang",
+    "Smoldering Stingray","Smooth toadfish","Snakehead","Snipefish","Snook","Snowback Char",
+    "Snowfish","Snowflake Flounder","Snowflake Smelt","Snowgill Dace","Sockeye Salmon","Spadefish",
+    "Sparkfin Tetra","Sparkler Sardine","Sparkling Corkfin","Spectral Serpent","Spider Salmon",
+    "Spiderfish","Spiny Hatchetfish","Splendid toadfish","Split Eye Snapper","Spotted Drum",
+    "Spotted Moray Eel","Sprayfin","Squid","Squirrelfish","Squirrelray","Starbellied Wolf Fish",
+    "Starlit Weaver","Static Ray","Stingray","Stockingfish","Stoplight Loosejaw",
+    "Stoplight Parrotfish","Storm Eel","Storm Skipper","Stormcloud Angelfish","Stormgazer",
+    "Stringed Grouper","Sturgeon","Subzero Stargazer","Suckermouth Catfish","Sulfur Snapper",
+    "Sunfish","Sunflare Tetra","Sunken Silverscale","Sunny Turkey","Sunray Sunscale","Sunsquid",
+    "Surge Pike","Swamp Bass","Swampfish","Swampjaw","Sweetfish","Sweetheart Seahorse","Swordfish",
+    "Tarnished Moongill","Tartaruga","Telescopefish","Tempest Ray","Temple Drifter","Temple Perch",
+    "Tentacle Eel","Tentacled Horror","The Whispering One","Thornfish","Three-eyed Fish",
+    "Thunder Bass","Thunder Serpent","Tidal Pike","Tidallow","Tide Fang","Tidepopper","Tilefish",
+    "Tinsel Trout","Titan Tuna","Titanfang Grouper","Titanic Black Seadevil","Titanic Sturgeon",
+    "Toilet Fish","Treble Bass","Trevally","Tripod Fish","Tropicspike","Trout","Trumpetfish",
+    "Tumor Pike","Tuskmaw","Twilight Eel","Twilight Glowfish","Twilight Tentaclefish","Typhleotris",
+    "Typhoon Tailfin","Typhoon Tuna","Umbral Shark","Vampire Perch","Vampire Squid",
+    "Veilborn Parasite","Veinspawn","Velvet Belly Lanternshark","Verdant Mirage","Vinefish",
+    "Viperfish","Void Angler","Void Emperor","Voidfin Mahi","Voidglow Ghostfish","Voidscale Guppy",
+    "Volcanic Prowler","Voltfin Carp","Voltfish","Vortex Barracuda","Vortex Ray","Walleye",
+    "Warty Angler","Warty Frogfish","Watching Glowfin","Wave Piercer","Werewolf Walleye",
+    "Whale Shark","Whiptail Catfish","Whisker Bill","Whisper Eel","White Bass","White Perch",
+    "White Sturgeon","Wraithfin","Wreath Wrasse","Wretched Guppy","X-ray Tetra","Xiphactinus",
+    "Yellow Boxfish","Yellowfin Tuna","Zebrafishlet","Zombiefish",
+}
+
+D.SnapMutationList = {
+    "None",
+    "Amped","Obsidian","Igneous","Solar","Sweet","Lovely","Candy","Rose","Embraced","Lovestruck",
+    "Heartburst","Ascended","Brined","Rusty","Coral","Mourned","Ocean's Ruin","Forgotten","Husk",
+    "Requies","Fallen","Withered","Royal","New Years","Astraeus","Noctic","Corvid","Frostnova",
+    "Merry","Jingle Bell","Boreal","Peppermint","Gingerbread","Frostbitten","Permafrost","Santa",
+    "Honked","Gravy","Pancake","Putrid","Magical","Gleebous","Distraught","Lucid","Phantom",
+    "Fabulous","Unlucky","Jackpot","Frightful","Spooky","Eerie","Necrotic","Batty","Wicked",
+    "Jack's Curse","Nightmare","Breezed","Upside-Down","Part","Birthday","Poisoned","Vined",
+    "Shrouded","Mossy","Toxic","Glowy","Dirty","Mastered","Luminescent","Crimson","Exploded",
+    "Galaxy","Atomic","Alien","Fragmented","Mayhem","Madness","67","Tryhard","Darkness","Mango",
+    "Oblivion","Summer","Popsicle","Beachy","Nova","Nico's Nyantics","Skrunkly","Nullified",
+    "Galactic","Spirit","Lightened","Rainbow Cluster","Mace","Tormented","Surreal","Chilled",
+    "Glacial","Rooted","Botanic","Venomous","Chlorowoken","Soulless","Wisp","Haunted","Spectral",
+    "Golden","Fortune","Lustrous","Radiant","Siren's Spite","Evil","Serene","Quiet","Nocturnal",
+    "Diurnal","Flora","Infernal","Patriotic","Snowy","Smurf","Puritas","Sacratus","Levitas",
+    "Gemstone","Oscar","Carrot","Umbra","Awesome","Brother","Sanguine","Chaotic","Lost",
+    "Moon-Kissed","Ember","Cracked","Emberflame","Cursed Touch","Bloom","Mother Nature",
+    "Green Leaf","Brown Wood","Oak","Cement","Female","Mission Specialist","Fixer",
+    "Paleontologist","Cursed","Ashen Fortune","Prismize","King's Blessing","Tentacle Surge",
+    "Electric Shock","Charred","Crystalized","Heavenly","Sleet","Blighted","Albino","Darkened",
+    "Electric","Glossy","Midas","Silver","Translucent","Negative","Mythical","Frozen","Atlantean",
+    "Mosaic","Aurora","Nuclear","Hexed","Sunken","Greedy","Tidal","Lunar","Abyssal","Fungal",
+    "Solarblaze","Celestial","Fossilized","Amber","Scorched","Spicy","Purified","Revitalized",
+    "Seasonal","Aurous","Aurelian","Studded","Aureate","Aurulent","Aureolin","Sandstormy","Sandy",
+    "Blessed","Unsellable","Subspace","Anomalous","Glyphed","Harmonized","Sinister","Ghastly",
+    "Jolly","Festive","Minty","Firework","Wrath","Lightning","Astral","Stardust","Clover",
+    "Blarney","Chocolate","Doomsday","Easter","Red","Green","Blue","Pink","Yellow","Bubblegum",
+    "Lumpy","Rockstar","Colossal Ink","Neon","Lobster","Blue Moon","Rainbow",
+}
+
+D.Locations = {
+    ["???"] = CFrame.new(497.28, -655.42, -1770.71),
+    ["Abyssal Zenith"] = CFrame.new(-13447.83, -11050.60, 121.02),
+    ["Ancient Archives"] = CFrame.new(-3158.28, -754.61, 1873.31),
+    ["Ancient Isle"] = CFrame.new(6057.48, 195.12, 286.64),
+    ["Atlantean Storm"] = CFrame.new(-3662.12, 141.70, 780.09),
+    ["Atlantis"] = CFrame.new(-4260.43, -603.40, 1825.14),
+    ["Behind Waterfall"] = CFrame.new(20654.87, 139.89, -18007.32),
+    ["Birch Cay"] = CFrame.new(1688.56, 147.51, -2388.44),
+    ["Blue Moon - First Sea"] = CFrame.new(2743.25, 131.50, 2512.18),
+    ["Boreal Pines"] = CFrame.new(21590.09, 250.16, 4012.17),
+    ["Brine Pool"] = CFrame.new(-1787.60, -142.69, -3384.50),
+    ["Calm Zone"] = CFrame.new(-4356.28, -11160.87, 3733.14),
+    ["Carrot Garden"] = CFrame.new(3719.45, -1127.99, -1089.54),
+    ["Castaway Cliffs"] = CFrame.new(459.90, 204.00, -1938.74),
+    ["Challenger's Deep"] = CFrame.new(670.20, -3357.35, -1693.42),
+    ["Collapsed Ruins"] = CFrame.new(3143.34, -1101.96, 1624.77),
+    ["Coral Bastion"] = CFrame.new(2524.73, -1096.11, 849.94),
+    ["Crimson Cavern"] = CFrame.new(-994.66, -338.96, -4940.33),
+    ["Crowned Ruins"] = CFrame.new(3121.78, -1127.33, 2050.75),
+    ["Cryogenic Canal"] = CFrame.new(19988.45, 913.86, 5407.79),
+    ["Crystal Cove"] = CFrame.new(1361.44, -613.18, 2457.00),
+    ["Crystal Fissure"] = CFrame.new(21731.42, 134.47, 4001.87),
+    ["Cultist Lair"] = CFrame.new(4260.41, -2003.00, -4677.10),
+    ["Cultist Lair - Entrance"] = CFrame.new(50.77, -288.42, 1910.56),
+    ["Cupid's Island"] = CFrame.new(20641.13, 850.57, -17640.25),
+    ["Desolate Deep"] = CFrame.new(-1493.85, -234.70, -2837.54),
+    ["Detonator's Rest"] = CFrame.new(-1403.91, -843.74, -3482.22),
+    ["Earmark Island"] = CFrame.new(1279.13, 140.10, 542.61),
+    ["Ethereal Abyss"] = CFrame.new(-3790.56, -566.77, 1852.19),
+    ["Ethereal Trial"] = CFrame.new(-3803.22, -664.01, 1830.52),
+    ["Executive Headquarters"] = CFrame.new(-37.26, -246.55, 205.14),
+    ["Forgotten Temple"] = CFrame.new(-5125.93, -1759.56, -9871.60),
+    ["Forsaken Shores"] = CFrame.new(-2821.91, 213.92, 1518.06),
+    ["Frigid Cavern"] = CFrame.new(19800.15, 424.73, 5346.64),
+    ["Ghost Tavern"] = CFrame.new(295.04, 800.00, -6893.89),
+    ["Glacial Grotto"] = CFrame.new(19934.08, 1211.92, 5282.95),
+    ["Grand Reef"] = CFrame.new(-3618.28, 140.00, 502.10),
+    ["Haddock Rock"] = CFrame.new(-527.92, 156.33, -464.76),
+    ["Half of Whisper"] = CFrame.new(4313.69, -2234.82, -4681.31),
+    ["Harvesters Spike"] = CFrame.new(-1260.49, 134.60, 1579.02),
+    ["Inner Tidefall Castle"] = CFrame.new(4542.61, -1101.11, 946.08),
+    ["Keepers Altar"] = CFrame.new(1319.22, -805.29, -105.08),
+    ["Kraken Pool"] = CFrame.new(-4398.01, -996.26, 2051.75),
+    ["Lost Jungle"] = CFrame.new(-2708.26, 150.20, -2054.09),
+    ["Luminescent Cavern"] = CFrame.new(-2708.26, 150.20, -2054.09),
+    ["Merlin's Hut"] = CFrame.new(-946.89, 222.42, -985.54),
+    ["Mineshaft"] = CFrame.new(-466.27, -851.80, -133.91),
+    ["Moosewood"] = CFrame.new(385.68, 134.50, 250.40),
+    ["Mossjaw Rest"] = CFrame.new(-4857.97, -1790.56, -10220.56),
+    ["Mushgrove"] = CFrame.new(2666.55, 133.50, -758.31),
+    ["Mysterious Crack"] = CFrame.new(-1108.50, -292.26, -3279.06),
+    ["Mysterious River"] = CFrame.new(-1019.86, -325.13, -3748.90),
+    ["OverGrowth Caves"] = CFrame.new(19807.06, 426.33, 5341.04),
+    ["Passage of Oaths"] = CFrame.new(4363.88, -2482.57, -4682.22),
+    ["Poseidon Temple"] = CFrame.new(-4285.63, -683.42, 1168.26),
+    ["Poseidon Trial"] = CFrame.new(-3807.24, -550.69, 1082.53),
+    ["Roslit Bay"] = CFrame.new(-1684.01, 156.08, 439.96),
+    ["Roslit Volcano"] = CFrame.new(-1896.77, 176.63, 302.68),
+    ["Roslit Hamlet"] = CFrame.new(-1459.95, 133.14, 701.61),
+    ["Roslit Pond"] = CFrame.new(-1787.08, 148.07, 636.50),
+    ["Snow Burrow"] = CFrame.new(2759.10, 97.95, 2602.91),
+    ["Snowcap"] = CFrame.new(2812.06, 280.78, 2559.54),
+    ["Snowcap Cave"] = CFrame.new(2873.89, 144.51, 2601.30),
+    ["Statue of Sovereignty"] = CFrame.new(-138.67, 146.95, -1130.52),
+    ["Sunken Depths"] = CFrame.new(-4978.62, -694.01, 1821.56),
+    ["Sunken Reliquary"] = CFrame.new(2947.59, -1102.42, 72.65),
+    ["Sunken Trial"] = CFrame.new(-4937.98, -595.12, 1837.59),
+    ["Sunstone"] = CFrame.new(-1047.27, 202.84, -1111.12),
+    ["Sunstone Rift"] = CFrame.new(-1032.72, -561.13, -1344.93),
+    ["Sweetheart Shores"] = CFrame.new(20650.27, 142.52, -17726.15),
+    ["Terrapin"] = CFrame.new(-55.44, 133.12, 2029.67),
+    ["Terrapin Island Cave"] = CFrame.new(51.42, 152.97, 2006.59),
+    ["Thalassar's Secret"] = CFrame.new(2888.87, -578.06, 1255.43),
+    ["The Arch"] = CFrame.new(1005.17, 132.93, -1241.42),
+    ["The Bunker"] = CFrame.new(1846.38, -327.14, -2384.53),
+    ["The Depths"] = CFrame.new(952.22, -711.66, 1230.06),
+    ["The Depths - Maze"] = CFrame.new(1162.42, -729.79, 1311.02),
+    ["The Keeper's Secret"] = CFrame.new(2234.31, -802.77, 1035.99),
+    ["The Sanctum"] = CFrame.new(4292.10, -2652.54, -4671.55),
+    ["The Void"] = CFrame.new(-32099.49, 10010.04, -23302.99),
+    ["Tidefall"] = CFrame.new(3906.72, -1092.81, 912.64),
+    ["Treasure Island"] = CFrame.new(8293.00, 192.13, -17212.79),
+    ["Trident"] = CFrame.new(-1481.28, -223.51, -2221.96),
+    ["Trident Entrance"] = CFrame.new(-1476.97, -224.07, -2313.51),
+    ["Underground Music Venue"] = CFrame.new(2051.02, -643.50, 2472.21),
+    ["Underwater Cave"] = CFrame.new(3204.82, -399.22, 976.88),
+    ["Underwater Opening"] = CFrame.new(3219.60, 132.91, 847.59),
+    ["Upper Snowcap"] = CFrame.new(2822.26, 283.83, 2544.17),
+    ["Veil of the Forsaken"] = CFrame.new(-2357.54, -11177.86, 7106.80),
+    ["Vertigo"] = CFrame.new(-72.79, -506.79, 1538.82),
+    ["Vertigo Dip"] = CFrame.new(-20.53, -702.61, 1232.18),
+    ["Zeus Trial"] = CFrame.new(-4296.86, -665.89, 2426.31),
+    ["Zeus's Rod Room"] = CFrame.new(-4307.33, -606.60, 2723.37),
+}
+D.LocationNames = {}
+for name in pairs(D.Locations) do table.insert(D.LocationNames, name) end
+table.sort(D.LocationNames)
+
+D.SpearLocations = {
+    ["Lost Jungle"] = CFrame.new(-2591.05, 143.69, -1940.39) * CFrame.Angles(math.rad(180), math.rad(-29.96), math.rad(180)),
+    ["Coral Bastion"] = CFrame.new(2597.93, -1102.88, 872.26) * CFrame.Angles(0, math.rad(-10.22), 0),
+    ["Tidefall"] = CFrame.new(3000.22, -1110.21, 774.12) * CFrame.Angles(math.rad(-180), math.rad(-11.25), math.rad(180)),
+    ["Collapse Ruin"] = CFrame.new(3085.12, -1133.90, 1737.09) * CFrame.Angles(0, math.rad(44.08), 0),
+    ["Crowned Ruins"] = CFrame.new(3050.45, -1137.82, 2062.73) * CFrame.Angles(math.rad(-180), math.rad(7.32), math.rad(-180)),
+}
+D.SpearLocNames = {}
+for name in pairs(D.SpearLocations) do table.insert(D.SpearLocNames, name) end
+table.sort(D.SpearLocNames)
+
+D.AltarCFrame = CFrame.new(1310.65, -802.43, -82.53)
+D.StorageCFrame = CFrame.new(2931.66, 4252.44, 2975.60) * CFrame.Angles(0, math.rad(84.84), 0)
+D.StorageRadius = 15
+D.ServerFinderURL = "https://menghub-5c6c2-default-rtdb.firebaseio.com/servers.json"
+D.WaterKeywords = { "water", "ocean", "sea", "lake", "pond", "river", "pool" }
+D.StaffKeywords = { "staff", "moderator", "mod_" }
+D.CrateList = { "Bait Crate", "Tropical Bait Crate", "Quality Bait Crate", "Carbon Crate", "Metal Strongbox" }
+D.PurchaseItemsList = {
+    "Basic Diving Gear", "Advanced Diving Gear", "Flippers", "Super Flippers",
+    "Basic Oxygen Tank", "Beginner Oxygen Tank", "Intermediate Oxygen Tank", "Advanced Oxygen Tank",
+    "Winter Cloak", "Fish Radar", "Pickaxe", "Glider", "Advanced Glider", "Tidebreaker",
+    "Magic Mirror", "Traveler's Whistle", "Crab Cage", "Reinforced Crab Cage",
+    "Golden Crab Cage", "Coral Crab Cage", "Relic Crab Cage", "Conception Conch", "Abyssal Tonic", "Firework",
+}
+
+-- =====================================================
+-- HELPERS
+-- =====================================================
+SH.notify = function(title, content, duration)
+    if not SH.Window then return end
+    pcall(function()
+        SH.Window:Notify({
+            Title = title or "SolanaHub",
+            Content = content or "",
+            Duration = duration or 3,
+            Icon = "lucide:bell",
+        })
+    end)
+end
+
+SH.getHRP = function()
+    local c = LocalPlayer.Character
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+SH.getHum = function()
+    local c = LocalPlayer.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+SH.getBackpack = function()
+    return LocalPlayer:FindFirstChild("Backpack")
+end
+
+SH.getNet = function()
+    local p = ReplicatedStorage:FindFirstChild("packages")
+    return p and p:FindFirstChild("Net")
+end
+
+SH.getEvents = function()
+    return ReplicatedStorage:FindFirstChild("events")
+end
+
+SH.teleportTo = function(cf)
+    local hrp = SH.getHRP()
+    if hrp and cf then hrp.CFrame = cf end
+end
+
+SH.firePromptNear = function(obj)
+    if not obj then return false end
+    local prompt = obj:IsA("ProximityPrompt") and obj or obj:FindFirstChildOfClass("ProximityPrompt")
+    if not prompt then
+        for _, d in ipairs(obj:GetDescendants()) do
+            if d:IsA("ProximityPrompt") then
+                prompt = d
+                break
+            end
+        end
+    end
+    if prompt then
+        pcall(fireproximityprompt, prompt)
+        return true
+    end
+    return false
+end
+
+SH.getEquippedRod = function()
+    local c = LocalPlayer.Character
+    if not c then return nil end
+    for _, tool in ipairs(c:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("events") then return tool end
+    end
+    return nil
+end
+
+SH.setToggle = function(flag, value)
+    local t = SH.Toggles[flag]
+    if t and t.Set then pcall(function() t:Set(value) end) end
+end
+
+SH.findRemote = function(names)
+    local net = SH.getNet()
+    if not net then return nil end
+    for _, name in ipairs(names) do
+        local r = net:FindFirstChild(name)
+        if r then return r end
+    end
+    return nil
+end
+
+-- =====================================================
+-- [1] REEL HOOK
+-- =====================================================
+SH.cancelFishing = function()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+    if rootPart then rootPart.Anchored = false end
+
+    local reelUI = PlayerGui:FindFirstChild("reel")
+    if reelUI then reelUI:Destroy() end
+
+    local hud = PlayerGui:FindFirstChild("hud")
+    if hud then hud.Enabled = true end
+
+    local rod = SH.getEquippedRod()
+    if rod then
+        if rod.events:FindFirstChild("reset") then
+            pcall(function() rod.events.reset:FireServer() end)
+        end
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            local rodName = rod.Name
+            humanoid:UnequipTools()
+            task.wait(0.1)
+            local bp = SH.getBackpack()
+            local backpackRod = bp and bp:FindFirstChild(rodName)
+            if backpackRod then humanoid:EquipTool(backpackRod) end
+        end
+    end
+end
+
+SH.snapMatches = function(fish)
+    local fishName = fish and fish.Name
+    local fishMutation = fish and fish.Mutation
+    local fishRarity = fish and (fish.Rarity or fish.rarity)
+    local iShiny = fish and fish.Shiny == true
+    local iSparkling = fish and fish.Sparkling == true
+
+    local nameOk = (C.SnapFishName == "None") or (fishName == C.SnapFishName)
+    local mutationOk = (C.SnapMutation == "None") or (fishMutation == C.SnapMutation)
+    local rarityOk = (C.SnapRarity == "None") or (tostring(fishRarity) == C.SnapRarity)
+
+    local shinyOk = false
+    if C.SnapShinyType == "None" then
+        shinyOk = true
+    elseif C.SnapShinyType == "Shiny" then
+        shinyOk = iShiny and not iSparkling
+    elseif C.SnapShinyType == "Sparkling" then
+        shinyOk = iSparkling
+    elseif C.SnapShinyType == "Shiny + Sparkling" then
+        shinyOk = iShiny and iSparkling
+    end
+
+    return (nameOk and mutationOk and shinyOk and rarityOk), fishName, fishMutation, fishRarity
+end
+
+SH.hookReel = function()
+    local function findModule(name)
+        for _, v in ipairs(ReplicatedStorage:GetDescendants()) do
+            if v:IsA("ModuleScript") and v.Name == name then return v end
+        end
+        return nil
+    end
+
+    local reelModule = findModule("ReelController")
+    if not reelModule then return end
+    local ok, Controller = pcall(require, reelModule)
+    if not ok or not Controller then return end
+
+    if not Controller._OldStartReel then Controller._OldStartReel = Controller.StartReel end
+    if not Controller._OldEndMinigame then Controller._OldEndMinigame = Controller.EndMinigame end
+
+    Controller.EndMinigame = function(self, result)
+        local root = SH.getHRP()
+        if root then root.Anchored = false end
+        return Controller._OldEndMinigame(self, result)
+    end
+
+    Controller.StartReel = function(data)
+        if C.TotemActive then
+            return Controller._OldStartReel(data)
+        end
+
+        if C.SnapReel then
+            local matched, fishName, fishMutation, fishRarity = SH.snapMatches(data and data.fish)
+            if not matched then
+                task.spawn(SH.cancelFishing)
+                return nil
+            end
+
+            SH.notify("Snap Reel", "Match: " .. tostring(fishName), 3)
+            if C.WebhookEnabled then
+                pcall(function()
+                    SH.sendWebhook("🎣 Snap Reel Match",
+                        "**Fish:** " .. tostring(fishName) ..
+                        "\n**Mutation:** " .. tostring(fishMutation or "None") ..
+                        "\n**Rarity:** " .. tostring(fishRarity or "?"), 5763719)
+                end)
+            end
+        end
+
+        local Minigame = Controller._OldStartReel(data)
+        if not Minigame then return end
+
+        task.spawn(function()
+            while Minigame and Minigame.AddModifier do
+                if C.Mode == "Fast" then
+                    Minigame:AddModifier("barSize", "force", 1)
+                    Minigame:AddModifier("progress", "force", 100)
+                else
+                    Minigame:AddModifier("barSize", "force", 1)
+                    Minigame:AddModifier("resilience", "multiply", 5)
+                end
+                task.wait()
+            end
+        end)
+
+        return Minigame
+    end
+end
+
+-- =====================================================
+-- [2] AUTO FISHING
+-- =====================================================
+SH.autoCastLoop = function()
+    task.spawn(function()
+        local okNet, Net = pcall(function()
+            return require(ReplicatedStorage:WaitForChild("packages"):WaitForChild("Net"))
+        end)
+        if not okNet or not Net then return end
+        local castRemote = Net:RemoteFunction("FishingRod/Cast", -1)
+
+        local function getRodTool()
+            local char = LocalPlayer.Character
+            if not char then return nil end
+            for _, tool in ipairs(char:GetChildren()) do
+                if tool:IsA("Tool") and tool.Name:lower():find("rod") then return tool end
+            end
+            return nil
+        end
+        local function hasBobber(tool) return tool:FindFirstChild("bobber") ~= nil end
+        local function isCasted(tool)
+            local values = tool:FindFirstChild("values")
+            local casted = values and values:FindFirstChild("casted")
+            return casted ~= nil and casted.Value == true
+        end
+
+        while true do
+            task.wait(0.3)
+            if not C.AutoCast then continue end
+            local char = LocalPlayer.Character
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            if not humanoid or humanoid.Health <= 0 then continue end
+            local tool = getRodTool()
+            if not tool or hasBobber(tool) or isCasted(tool) then continue end
+
+            char:SetAttribute("Fishing", true)
+            char:SetAttribute("FishingWalkSpeed", 4)
+
+            local castSuccess = false
+            pcall(function() castSuccess = castRemote:InvokeServer(95, true) end)
+            if not castSuccess then
+                pcall(function() castSuccess = castRemote:InvokeServer(95, false) end)
+            end
+            if not castSuccess then
+                char:SetAttribute("Fishing", nil)
+                char:SetAttribute("FishingWalkSpeed", nil)
+                task.wait(1)
+                continue
+            end
+
+            local waitStart = tick()
+            while C.AutoCast do
+                task.wait(0.2)
+                local currentTool = getRodTool()
+                if not currentTool then break end
+                if hasBobber(currentTool) or isCasted(currentTool) then break end
+                if tick() - waitStart > 30 then break end
+            end
+
+            waitStart = tick()
+            while C.AutoCast do
+                task.wait(0.3)
+                local currentTool = getRodTool()
+                if not currentTool then break end
+                if not hasBobber(currentTool) and not isCasted(currentTool) then break end
+                if tick() - waitStart > 90 then break end
+            end
+
+            char:SetAttribute("Fishing", nil)
+            char:SetAttribute("FishingWalkSpeed", nil)
+            task.wait(0.5)
+        end
+    end)
+end
+
+SH.startAutoShake = function()
+    task.spawn(function()
+        while true do
+            if C.AutoShake and S.RemoteShake then
+                pcall(function() S.RemoteShake:FireServer() end)
+                task.wait(C.ShakeDelay / 1000)
+            else
+                task.wait(0.2)
+            end
+        end
+    end)
+end
+
+SH.startAutoEquip = function()
+    task.spawn(function()
+        while task.wait(0.5) do
+            if C.AutoEquip and not C.TotemActive and not SH.getEquippedRod() then
+                local char = LocalPlayer.Character
+                local bp = SH.getBackpack()
+                if char and bp then
+                    for _, tool in ipairs(bp:GetChildren()) do
+                        if tool:IsA("Tool") and tool:FindFirstChild("events") then
+                            pcall(function() char.Humanoid:EquipTool(tool) end)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+SH.isWaterPart = function(part)
+    if not part:IsA("BasePart") then return false end
+    local nameLower = string.lower(part.Name)
+    for _, keyword in ipairs(D.WaterKeywords) do
+        if string.find(nameLower, keyword) then return true end
+    end
+    if part.Transparency >= 0.3 and part.Transparency <= 0.9 then
+        local c = part.Color
+        if c.B > c.R and c.B > 0.3 then return true end
+    end
+    return false
+end
+
+SH.findWaterY = function(character, rod, castX, rootY, castZ, bobberSizeY)
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.FilterDescendantsInstances = { character, rod }
+
+    local result = Workspace:Raycast(Vector3.new(castX, rootY + 50, castZ), Vector3.new(0, -500, 0), rp)
+    if result and result.Material == Enum.Material.Water then
+        return result.Position.Y + bobberSizeY / 2
+    end
+    if result and result.Instance and SH.isWaterPart(result.Instance) then
+        return result.Instance.Position.Y + result.Instance.Size.Y / 2
+    end
+
+    local op = OverlapParams.new()
+    op.FilterDescendantsInstances = { character, rod }
+    op.FilterType = Enum.RaycastFilterType.Exclude
+    local nearby = Workspace:GetPartBoundsInBox(CFrame.new(castX, rootY, castZ), Vector3.new(20, 40, 20), op)
+    for _, part in ipairs(nearby) do
+        if SH.isWaterPart(part) then
+            return part.Position.Y + part.Size.Y / 2
+        end
+    end
+
+    local checkPos = Vector3.new(castX, rootY, castZ)
+    local region = Region3.new(checkPos - Vector3.new(10, 50, 10), checkPos + Vector3.new(10, 50, 10))
+    region = region:ExpandToGrid(4)
+    local materials = Workspace.Terrain:ReadVoxels(region, 4)
+    local size = materials.Size
+    for x = 1, size.X do
+        for y = size.Y, 1, -1 do
+            for z = 1, size.Z do
+                if materials[x][y][z] == Enum.Material.Water then
+                    return region.CFrame.Position.Y + (y - size.Y / 2) * 4
+                end
+            end
+        end
+    end
+
+    return rootY - 2
+end
+
+SH.startInstantBobber = function()
+    RunService.RenderStepped:Connect(function()
+        if not C.InstantBobber then
+            S.BobberProcessed = {}
+            return
+        end
+        local character = LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local rod = character:FindFirstChildOfClass("Tool")
+        local bobber = rod and rod:FindFirstChild("bobber")
+        if not bobber or not bobber:IsA("BasePart") then return end
+
+        bobber.CanCollide = false
+        bobber.CanTouch = false
+        bobber.CanQuery = false
+
+        if not S.BobberProcessed[bobber] then
+            local rootPos = hrp.Position
+            local forward = hrp.CFrame.LookVector * 3
+            local castX = rootPos.X + forward.X
+            local castZ = rootPos.Z + forward.Z
+            local targetY = SH.findWaterY(character, rod, castX, rootPos.Y, castZ, bobber.Size.Y)
+            S.BobberProcessed[bobber] = Vector3.new(castX, targetY, castZ)
+            bobber.Destroying:Once(function() S.BobberProcessed[bobber] = nil end)
+        end
+
+        local targetPos = S.BobberProcessed[bobber]
+        if targetPos then
+            bobber.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z)
+            bobber.AssemblyLinearVelocity = Vector3.zero
+            bobber.AssemblyAngularVelocity = Vector3.zero
+        end
+    end)
+end
+
+-- =====================================================
+-- [3] AUTO SELL & SPEAR
+-- =====================================================
+SH.runAutoSell = function()
+    task.spawn(function()
+        while C.AutoSell do
+            local bp = SH.getBackpack()
+            if bp and #bp:GetChildren() > 1 and S.SellEvent then
+                pcall(function() S.SellEvent:InvokeServer() end)
+            end
+            task.wait(C.SellInterval)
+        end
+    end)
+end
+
+SH.runAutoSpear = function()
+    task.spawn(function()
+        local targetCFrame = D.SpearLocations[C.AutoSpearLocation]
+        if targetCFrame then
+            SH.teleportTo(targetCFrame)
+            task.wait(1)
+        end
+
+        while C.AutoSpear do
+            local hrp = SH.getHRP()
+            if not hrp then
+                task.wait(1)
+                continue
+            end
+
+            local foundAnyFish = false
+
+            if S.SpearRemote then
+                for _, zone in ipairs(CollectionService:GetTagged("SpearfishingZone")) do
+                    if not C.AutoSpear then break end
+                    local zoneFish = zone:FindFirstChild("ZoneFish")
+                    if zoneFish then
+                        for _, fish in ipairs(zoneFish:GetChildren()) do
+                            if not C.AutoSpear then break end
+                            local uid = fish:GetAttribute("UID")
+                            if uid then
+                                foundAnyFish = true
+                                pcall(function() S.SpearRemote:InvokeServer(uid, nil, false) end)
+                                task.wait(1.5)
+                            end
+                        end
+                    end
+                end
+
+                if not foundAnyFish then
+                    local roaming = Workspace:FindFirstChild("active") and Workspace.active:FindFirstChild("roamingFish")
+                    if roaming then
+                        local params = OverlapParams.new()
+                        params.IncludeInstances = { roaming }
+                        for _, part in ipairs(Workspace:GetPartBoundsInRadius(hrp.Position, 12, params)) do
+                            if not C.AutoSpear then break end
+                            local uid = part:GetAttribute("UID")
+                            if uid then
+                                foundAnyFish = true
+                                pcall(function() S.SpearRemote:InvokeServer(uid, nil, true) end)
+                                task.wait(1.5)
+                            end
+                        end
+                    end
+                end
+            else
+                SH.notify("Spear Fishing", "Spear remote not found", 3)
+                C.AutoSpear = false
+                SH.setToggle("AutoSpear", false)
+                break
+            end
+
+            if not foundAnyFish then task.wait(1.5) end
+            task.wait(0.3)
+        end
+    end)
+end
+
+-- =====================================================
+-- [4] AUTO TOTEM
+-- =====================================================
+SH.getTimeOfDay = function()
+    local label = PlayerGui:FindFirstChild("hud")
+        and PlayerGui.hud:FindFirstChild("safezone")
+        and PlayerGui.hud.safezone:FindFirstChild("worldstatuses")
+        and PlayerGui.hud.safezone.worldstatuses:FindFirstChild("4_cycle")
+        and PlayerGui.hud.safezone.worldstatuses["4_cycle"]:FindFirstChild("label")
+    if label and label:IsA("TextLabel") then
+        return string.find(string.lower(label.Text), "night") and "Night" or "Day"
+    end
+    return "Day"
+end
+
+SH.useTotem = function(name)
+    local char = LocalPlayer.Character
+    local bp = SH.getBackpack()
+    if not char or not bp then return end
+
+    C.TotemActive = true
+
+    local tool = bp:FindFirstChild(name)
+    if tool and tool:IsA("Tool") then
+        pcall(function() char.Humanoid:EquipTool(tool) end)
+        task.wait(0.5)
+        pcall(function() tool:Activate() end)
+        SH.notify("Totem", "Used: " .. name, 2)
+    else
+        local equipped = char:FindFirstChild(name)
+        if equipped and equipped:IsA("Tool") then
+            pcall(function() equipped:Activate() end)
+            SH.notify("Totem", "Used: " .. name, 2)
+        else
+            SH.notify("Totem", "Not in backpack: " .. name, 3)
+        end
+    end
+
+    task.wait(1)
+    C.TotemActive = false
+end
+
+SH.runAutoTotem = function()
+    task.spawn(function()
+        local lastTimeOfDay = SH.getTimeOfDay()
+        local lastUseTime = 0
+
+        while C.AutoTotem do
+            task.wait(1)
+            local currentTime = SH.getTimeOfDay()
+            local isTimeChanged = currentTime ~= lastTimeOfDay
+
+            if isTimeChanged or (tick() - lastUseTime >= C.TotemDelay) then
+                local totemToUse = currentTime == "Night" and C.TotemNight or C.TotemDay
+                if totemToUse == "None" or totemToUse == "" then
+                    SH.notify("Totem", "No " .. string.lower(currentTime) .. " totem selected", 3)
+                elseif not C.TotemActive then
+                    SH.useTotem(totemToUse)
+                end
+                lastUseTime = tick()
+                lastTimeOfDay = currentTime
+            end
+        end
+    end)
+end
+
+SH.runAutoBuyTotem = function()
+    task.spawn(function()
+        while C.AutoBuyTotem do
+            local ev = SH.getEvents()
+            if C.SelectedTotem ~= "" and ev and ev:FindFirstChild("purchase") then
+                pcall(function() ev.purchase:FireServer(C.SelectedTotem, "Item", nil, 1) end)
+            end
+            task.wait(C.TotemInterval)
+        end
+    end)
+end
+
+-- =====================================================
+-- [5] AUTO APPRAISE
+-- =====================================================
+SH.parseAppraise = function(text)
+    local cleanText = text:gsub("<[^>]*>", "")
+    local hasShiny = cleanText:find("Shiny") ~= nil
+    local hasSparkling = cleanText:find("Sparkling") ~= nil
+    local hasBig = cleanText:find("Big") ~= nil
+
+    local mutation = "None"
+    for _, mutName in ipairs(D.DetectionList) do
+        if mutName ~= "None" and cleanText:find(mutName, 1, true) then
+            mutation = mutName
+            break
+        end
+    end
+    return { hasShiny = hasShiny, hasSparkling = hasSparkling, hasBig = hasBig, mutation = mutation }
+end
+
+SH.appraiseMatch = function(result)
+    if C.TargetMutation == "None" and C.ShinyType == "None" and C.TargetSize == "None" then
+        return false
+    end
+    if C.TargetMutation ~= "None" and result.mutation == C.TargetMutation then return true end
+    if C.TargetSize == "Big" and result.hasBig then return true end
+    if C.ShinyType == "Shiny" and result.hasShiny and not result.hasSparkling then return true end
+    if C.ShinyType == "Sparkling" and result.hasSparkling then return true end
+    if C.ShinyType == "Shiny + Sparkling" and result.hasShiny and result.hasSparkling then return true end
+    return false
+end
+
+SH.runAutoAppraise = function()
+    local net = SH.getNet()
+    local dialogRF = net and net:FindFirstChild("RF/DialogInteract")
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not dialogRF then
+        SH.notify("Appraise", "Character or remote not ready", 3)
+        C.AutoAppraise = false
+        SH.setToggle("AutoApp", false)
+        return
+    end
+
+    task.spawn(function()
+        local originalCFrame = hrp.CFrame
+        hrp.CFrame = CFrame.new(448.84, 150.54, 207.15) * CFrame.Angles(0, math.rad(-86.58), 0)
+        task.wait(0.5)
+
+        local npc = Workspace:FindFirstChild("world") and Workspace.world:FindFirstChild("npcs")
+            and Workspace.world.npcs:FindFirstChild("Appraiser")
+        local prompt = npc and npc:FindFirstChildOfClass("ProximityPrompt")
+        if prompt then
+            pcall(fireproximityprompt, prompt)
+            task.wait(1)
+        else
+            SH.notify("Appraise", "Appraiser prompt not found", 3)
+            C.AutoAppraise = false
+            SH.setToggle("AutoApp", false)
+            hrp.CFrame = originalCFrame
+            return
+        end
+
+        hrp.CFrame = originalCFrame
+        task.wait(0.2)
+        pcall(function() dialogRF:InvokeServer(1, 1) end)
+        task.wait(0.3)
+
+        while C.AutoAppraise do
+            pcall(function() dialogRF:InvokeServer(6, 1) end)
+            task.wait(0.01)
+            pcall(function() dialogRF:InvokeServer(1, 1) end)
+            task.wait(0.01)
+
+            local subvalues = char:FindFirstChild("fishinfo")
+                and char.fishinfo:FindFirstChild("Info")
+                and char.fishinfo.Info:FindFirstChild("Subvalues")
+
+            if subvalues and subvalues:IsA("TextLabel") then
+                if SH.appraiseMatch(SH.parseAppraise(subvalues.Text)) then
+                    C.AutoAppraise = false
+                    SH.setToggle("AutoApp", false)
+                    SH.notify("Appraise", "Target reached", 3)
+                    break
+                end
+            end
+        end
+    end)
+end
+
+-- =====================================================
+-- [6] AUTO ENCHANT
+-- =====================================================
+SH.cleanEnchantText = function(s)
+    return (s:gsub("[^%a%s%-]", ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " "))
+end
+
+SH.getEquippedRodInfo = function()
+    local info = { Name = "None", PrimaryEnchant = "None", SecondaryEnchant = "None" }
+    pcall(function()
+        local rodsContainer = PlayerGui.hud.safezone.equipment.rods.scroll.safezone
+        for _, rodFrame in ipairs(rodsContainer:GetChildren()) do
+            if rodFrame:IsA("Frame") then
+                local equipBtn = rodFrame:FindFirstChild("equip")
+                if equipBtn and equipBtn.Text == "[Equipped]" then
+                    info.Name = rodFrame.Name
+                    local enchantsFolder = rodFrame:FindFirstChild("rod") and rodFrame.rod:FindFirstChild("enchants")
+                    if enchantsFolder then
+                        local p = enchantsFolder:FindFirstChild("enchant")
+                        if p and p.Text ~= "" then
+                            local c = SH.cleanEnchantText(p.Text)
+                            if c ~= "" then info.PrimaryEnchant = c end
+                        end
+                        local s = enchantsFolder:FindFirstChild("secondary")
+                        if s and s.Text ~= "" then
+                            local c = SH.cleanEnchantText(s.Text)
+                            if c ~= "" then info.SecondaryEnchant = c end
+                        end
+                    end
+                    break
+                end
+            end
+        end
+    end)
+    return info
+end
+
+SH.equipRelic = function(relicName)
+    local char = LocalPlayer.Character
+    local bp = SH.getBackpack()
+    if not char or not bp then return false end
+    local currentTool = char:FindFirstChildOfClass("Tool")
+    if currentTool and currentTool.Name == relicName then return true end
+    local tool = bp:FindFirstChild(relicName)
+    if tool then
+        pcall(function() char.Humanoid:EquipTool(tool) end)
+        task.wait(0.3)
+        return true
+    end
+    return false
+end
+
+SH.fireEnchantAltar = function()
+    local altar = Workspace:FindFirstChild("world")
+        and Workspace.world:FindFirstChild("interactables")
+        and Workspace.world.interactables:FindFirstChild("Enchant Altar")
+    if not altar then return false end
+    local prompt = altar:FindFirstChild("PromptTemplate")
+    if prompt and not prompt:IsA("ProximityPrompt") then
+        prompt = prompt:FindFirstChildOfClass("ProximityPrompt") or altar:FindFirstChildOfClass("ProximityPrompt")
+    end
+    if prompt then
+        pcall(fireproximityprompt, prompt)
+        return true
+    end
+    return false
+end
+
+SH.confirmEnchant = function()
+    pcall(function()
+        local confirmBtn = PlayerGui:FindFirstChild("over")
+            and PlayerGui.over:FindFirstChild("prompt")
+            and PlayerGui.over.prompt:WaitForChild("confirm", 3)
+        if confirmBtn then
+            GuiService.SelectedObject = confirmBtn
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+            task.wait(0.1)
+            GuiService.SelectedObject = nil
+        end
+    end)
+end
+
+SH.startAutoEnchant = function()
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            if C.AutoEnchant then
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local currentRod = SH.getEquippedRodInfo()
+                    if currentRod.Name == "None" then
+                        SH.notify("Enchant", "No equipped rod found", 3)
+                        C.AutoEnchant = false
+                        SH.setToggle("AutoEnch", false)
+                    else
+                        local useSecondary = D.SecondaryRelics[C.SelectedRelic] == true
+                        local currentEnchant = useSecondary and currentRod.SecondaryEnchant or currentRod.PrimaryEnchant
+
+                        if currentEnchant and string.find(string.lower(currentEnchant), string.lower(C.TargetEnchant), 1, true) then
+                            C.AutoEnchant = false
+                            SH.setToggle("AutoEnch", false)
+                            SH.notify("Enchant", "Target reached: " .. currentEnchant, 4)
+                        else
+                            if (hrp.Position - D.AltarCFrame.Position).Magnitude > 10 then
+                                hrp.CFrame = D.AltarCFrame
+                                task.wait(0.5)
+                            end
+
+                            if SH.equipRelic(C.SelectedRelic) then
+                                if SH.fireEnchantAltar() then
+                                    task.wait(0.5)
+                                    SH.confirmEnchant()
+                                end
+                                task.wait(1.5)
+                            else
+                                C.AutoEnchant = false
+                                SH.setToggle("AutoEnch", false)
+                                SH.notify("Enchant", "Relic not in backpack: " .. C.SelectedRelic, 3)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- =====================================================
+-- [7] FARM EXTRAS
+-- =====================================================
+SH.runAutoFavorite = function()
+    task.spawn(function()
+        local fav = SH.findRemote({ "RE/Backpack/Favorite", "RE/Inventory/Favorite" })
+        if not fav then
+            SH.notify("Favorite", "Favorite remote not found", 3)
+            C.AutoFavorite = false
+            SH.setToggle("AutoFav", false)
+            return
+        end
+
+        local ok, DC = pcall(function()
+            return require(ReplicatedStorage.client.legacyControllers.DataController)
+        end)
+        if not ok or not DC then
+            SH.notify("Favorite", "Data controller not available", 3)
+            C.AutoFavorite = false
+            SH.setToggle("AutoFav", false)
+            return
+        end
+
+        while C.AutoFavorite do
+            local inv = DC.PlayerDataReplicator:Index({ "Inventory" }) or {}
+            for uid, item in pairs(inv) do
+                if not C.AutoFavorite then break end
+                if type(item) == "table" and item.sub and typeof(item.sub.Weight) == "number" and not S.FavDone[uid] then
+                    S.FavDone[uid] = true
+                    pcall(function() fav:FireServer(uid, true) end)
+                    task.wait(0.2)
+                end
+            end
+            task.wait(5)
+        end
+    end)
+end
+
+SH.runAutoSellSelected = function()
+    task.spawn(function()
+        while C.AutoSellSelected do
+            local noFilter = C.SellSelectedRarity == "None" and C.SellSelectedName == "None"
+            local sel = SH.findRemote({ "RE/Sell/Selected", "RF/SellSelected" })
+            if sel then
+                pcall(function()
+                    if sel:IsA("RemoteEvent") then
+                        sel:FireServer(C.SellSelectedRarity, C.SellSelectedName)
+                    elseif sel:IsA("RemoteFunction") then
+                        sel:InvokeServer(C.SellSelectedRarity, C.SellSelectedName)
+                    end
+                end)
+            elseif noFilter and S.SellEvent then
+                pcall(function() S.SellEvent:InvokeServer() end)
+            else
+                SH.notify("Auto Sell", "Selective sell not available. Set filters to None to sell all.", 4)
+                C.AutoSellSelected = false
+                SH.setToggle("AutoSellSel", false)
+                break
+            end
+            task.wait(C.SellInterval or 5)
+        end
+    end)
+end
+
+-- =====================================================
+-- [8] COLLECT
+-- =====================================================
+SH.teleportAndPrompt = function(obj)
+    local part = obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+    if part then
+        SH.teleportTo(part.CFrame + Vector3.new(0, 3, 0))
+        task.wait(0.4)
+        SH.firePromptNear(part)
+        SH.firePromptNear(obj)
+    end
+end
+
+SH.loopWithReturn = function(flag, interval, scan)
+    task.spawn(function()
+        while C[flag] do
+            local hrp = SH.getHRP()
+            local last = hrp and hrp.CFrame
+            scan()
+            if last then SH.teleportTo(last) end
+            task.wait(interval)
+        end
+    end)
+end
+
+SH.runAutoCosmicRelic = function()
+    SH.loopWithReturn("AutoCosmicRelic", 3, function()
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if not C.AutoCosmicRelic then break end
+            local n = string.lower(obj.Name)
+            if n:find("cosmic") and n:find("relic") then
+                SH.teleportAndPrompt(obj)
+                task.wait(0.5)
+            end
+        end
+    end)
+end
+
+SH.runAutoFlower = function()
+    SH.loopWithReturn("AutoFlower", 4, function()
+        local roots = { Workspace:FindFirstChild("FlowersSpawners"), Workspace:FindFirstChild("flowers"), Workspace }
+        for _, root in ipairs(roots) do
+            if root then
+                for _, obj in ipairs(root:GetDescendants()) do
+                    if not C.AutoFlower then break end
+                    if string.lower(obj.Name):find("flower") and (obj:IsA("BasePart") or obj:IsA("Model")) then
+                        SH.teleportAndPrompt(obj)
+                        task.wait(0.3)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+SH.runAutoChest = function()
+    SH.loopWithReturn("AutoChest", 5, function()
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if not C.AutoChest then break end
+            local n = string.lower(obj.Name)
+            if (n:find("chest") or n:find("sunken")) and (obj:IsA("Model") or obj:IsA("BasePart")) then
+                SH.teleportAndPrompt(obj)
+                task.wait(0.4)
+            end
+        end
+    end)
+end
+
+SH.runAutoShell = function()
+    task.spawn(function()
+        while C.AutoShell do
+            for _, name in ipairs({ "RE/Shell/Claim", "RE/ClaimShell", "RF/Shell/Claim", "RE/ConvertShell" }) do
+                local r = SH.findRemote({ name })
+                if r then
+                    pcall(function()
+                        if r:IsA("RemoteEvent") then r:FireServer() end
+                        if r:IsA("RemoteFunction") then r:InvokeServer() end
+                    end)
+                end
+            end
+            local hrp = SH.getHRP()
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if not C.AutoShell then break end
+                if string.lower(obj.Name):find("shell") and (obj:IsA("BasePart") or obj:IsA("Model")) then
+                    local part = obj:IsA("BasePart") and obj or obj.PrimaryPart
+                    if part and hrp and (part.Position - hrp.Position).Magnitude < 80 then
+                        SH.firePromptNear(part)
+                    end
+                end
+            end
+            task.wait(3)
+        end
+    end)
+end
+
+SH.runCrabCage = function()
+    task.spawn(function()
+        while C.AutoCrabDeploy or C.AutoCrabClaim do
+            if C.AutoCrabDeploy then
+                local bp = SH.getBackpack()
+                local char = LocalPlayer.Character
+                if bp and char then
+                    for _, tool in ipairs(bp:GetChildren()) do
+                        if tool:IsA("Tool") and string.lower(tool.Name):find("crab cage") then
+                            pcall(function()
+                                char.Humanoid:EquipTool(tool)
+                                task.wait(0.3)
+                                tool:Activate()
+                            end)
+                            task.wait(0.5)
+                        end
+                    end
+                end
+            end
+            if C.AutoCrabClaim then
+                local hrp = SH.getHRP()
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if not C.AutoCrabClaim then break end
+                    local n = string.lower(obj.Name)
+                    if n:find("crab") and (n:find("cage") or n:find("claim")) then
+                        local part = obj:IsA("BasePart") and obj or obj.PrimaryPart
+                        if part and hrp and (part.Position - hrp.Position).Magnitude < 100 then
+                            SH.firePromptNear(part)
+                            SH.firePromptNear(obj)
+                        end
+                    end
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+SH.runAutoMerlin = function()
+    task.spawn(function()
+        while C.AutoMerlin do
+            local ev = SH.getEvents()
+            local purchase = ev and ev:FindFirstChild("purchase")
+            if purchase then
+                for _, item in ipairs({ "Merlin's Luck", "Merlin", "All Season Potion" }) do
+                    pcall(function() purchase:FireServer(item, "Item", nil, 1) end)
+                end
+            end
+            local npcs = Workspace:FindFirstChild("world") and Workspace.world:FindFirstChild("npcs")
+            local merlin = npcs and (npcs:FindFirstChild("Merlin") or npcs:FindFirstChild("Merlin's"))
+            if merlin then
+                local part = merlin.PrimaryPart or merlin:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    SH.teleportTo(part.CFrame + Vector3.new(0, 3, 0))
+                    task.wait(0.5)
+                    SH.firePromptNear(merlin)
+                end
+            end
+            task.wait(4)
+        end
+    end)
+end
+
+SH.runAutoAngler = function()
+    task.spawn(function()
+        while C.AutoAngler do
+            for _, name in ipairs({ "RE/Angler/Claim", "RF/Angler/Complete", "RE/Quest/Angler", "RF/DialogInteract" }) do
+                local r = SH.findRemote({ name })
+                if r then
+                    pcall(function()
+                        if r:IsA("RemoteEvent") then r:FireServer() end
+                        if r:IsA("RemoteFunction") then r:InvokeServer(1, 1) end
+                    end)
+                end
+            end
+            local npcs = Workspace:FindFirstChild("world") and Workspace.world:FindFirstChild("npcs")
+            if npcs then
+                for _, npc in ipairs(npcs:GetChildren()) do
+                    if string.lower(npc.Name):find("angler") then
+                        local part = npc.PrimaryPart or npc:FindFirstChildWhichIsA("BasePart")
+                        if part then
+                            SH.teleportTo(part.CFrame + Vector3.new(0, 3, 0))
+                            task.wait(0.5)
+                            SH.firePromptNear(npc)
+                        end
+                    end
+                end
+            end
+            task.wait(5)
+        end
+    end)
+end
+
+SH.useToolByName = function(name)
+    local char = LocalPlayer.Character
+    local bp = SH.getBackpack()
+    if not char or not bp then return false end
+    local tool = bp:FindFirstChild(name) or char:FindFirstChild(name)
+    if tool and tool:IsA("Tool") then
+        if tool.Parent == bp then
+            pcall(function() char.Humanoid:EquipTool(tool) end)
+            task.wait(0.25)
+        end
+        pcall(function() tool:Activate() end)
+        return true
+    end
+    return false
+end
+
+SH.startConsumables = function()
+    task.spawn(function()
+        local warned = {}
+        while true do
+            if C.AutoUsePotion and C.SelectedPotion ~= "None" then
+                if not SH.useToolByName(C.SelectedPotion) and not warned.potion then
+                    warned.potion = true
+                    SH.notify("Potion", "Not in backpack: " .. C.SelectedPotion, 3)
+                end
+            end
+            if C.AutoUseFood and C.SelectedFood ~= "None" then
+                if not SH.useToolByName(C.SelectedFood) and not warned.food then
+                    warned.food = true
+                    SH.notify("Food", "Not in backpack: " .. C.SelectedFood, 3)
+                end
+            end
+            task.wait(8)
+        end
+    end)
+end
+
+-- =====================================================
+-- [9] STORAGE & STAR CRATER
+-- =====================================================
+SH.getInventory = function()
+    if not S.StorageDataController then return {} end
+    local ok, inv = pcall(function()
+        return S.StorageDataController.PlayerDataReplicator:Index({ "Inventory" })
+    end)
+    return (ok and inv) or {}
+end
+
+SH.getItemRarity = function(name)
+    local ok, info = pcall(function()
+        local itemDisplay = ReplicatedStorage.client.modules.ui.Backpack.itemDisplayInfo
+        return require(itemDisplay)[name]
+    end)
+    return ok and info and info.rarity or nil
+end
+
+SH.collectStorageUIDs = function()
+    local out, seen = {}, {}
+    local bp = SH.getBackpack()
+    if not bp then return out end
+
+    local f = S.StorageFilter
+    if f.Name == "None" and f.Rarity == "None" and f.Mutation == "None" then
+        return out
+    end
+
+    local inv = SH.getInventory()
+    for _, tool in ipairs(bp:GetChildren()) do
+        local link = tool:FindFirstChild("link")
+        if tool:IsA("Tool") and link and link:IsA("StringValue") and link.Value ~= "" and not seen[link.Value] then
+            local uid = link.Value
+            local item = inv[uid]
+            local name = tool.Name
+            local rarity = SH.getItemRarity(name)
+            local mut = item and item.sub and item.sub.Mutation
+
+            local okName = f.Name == "None" or name == f.Name
+            local okRar = f.Rarity == "None" or rarity == f.Rarity
+            local okMut = f.Mutation == "None" or mut == f.Mutation
+
+            if okName and okRar and okMut then
+                seen[uid] = true
+                table.insert(out, uid)
+            end
+        end
+    end
+    return out
+end
+
+SH.getBackpackFishNames = function()
+    local list = { "None" }
+    local seen = {}
+    local bp = SH.getBackpack()
+    if bp then
+        for _, tool in ipairs(bp:GetChildren()) do
+            if tool:IsA("Tool") and tool:FindFirstChild("link") and not seen[tool.Name] then
+                seen[tool.Name] = true
+                table.insert(list, tool.Name)
+            end
+        end
+    end
+    table.sort(list, function(a, b)
+        if a == "None" then return true end
+        if b == "None" then return false end
+        return a < b
+    end)
+    return list
+end
+
+SH.runStorage = function()
+    local hrp = SH.getHRP()
+    local lastCFrame = hrp and hrp.CFrame
+    if not lastCFrame then
+        SH.notify("Storage", "Character not ready", 3)
+        S.StorageActive = false
+        return
+    end
+
+    local uids = SH.collectStorageUIDs()
+    if #uids == 0 then
+        SH.notify("Storage", "No fish match the filters", 3)
+        S.StorageActive = false
+        return
+    end
+
+    local net = SH.getNet()
+    local aquariumJoin = net and net:FindFirstChild("RE/PersonalAquarium/Join")
+    local addToStorage = net and net:FindFirstChild("RE/Storage/RequestAddToStorage")
+    if not addToStorage then
+        SH.notify("Storage", "Storage remote not found", 3)
+        S.StorageActive = false
+        return
+    end
+
+    if aquariumJoin then pcall(function() aquariumJoin:FireServer(10594128852) end) end
+    task.wait(0.8)
+
+    SH.teleportTo(D.StorageCFrame)
+    local waited = 0
+    while waited < 3 do
+        local h = SH.getHRP()
+        if h and (h.Position - D.StorageCFrame.Position).Magnitude <= D.StorageRadius then break end
+        task.wait(0.1)
+        waited = waited + 0.1
+    end
+
+    local count = 0
+    for _, uid in ipairs(uids) do
+        pcall(function() addToStorage:FireServer(uid) end)
+        count = count + 1
+        task.wait(0.1)
+    end
+
+    task.wait(0.5)
+    SH.teleportTo(lastCFrame)
+    SH.notify("Storage", "Sent " .. count .. " fish to storage", 3)
+    S.StorageActive = false
+end
+
+SH.runStarCrater = function()
+    if S.StarCraterActive then return end
+    local hrp = SH.getHRP()
+    local lastCFrame = hrp and hrp.CFrame
+
+    local craters = {}
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if obj.Name == "StarCrater" then table.insert(craters, obj) end
+    end
+    if #craters == 0 then
+        SH.notify("Star Crater", "No Star Craters found", 3)
+        return
+    end
+
+    S.StarCraterActive = true
+    local totalClaim = 0
+
+    for _, crater in ipairs(craters) do
+        for _, item in ipairs(crater:GetChildren()) do
+            local center = item:FindFirstChild("Center")
+            if center then
+                for _, child in ipairs(center:GetChildren()) do
+                    if child:IsA("ProximityPrompt") and child.Parent then
+                        local part = child.Parent
+                        if part:IsA("BasePart") then
+                            SH.teleportTo(CFrame.new(part.Position + Vector3.new(0, 3, 0)))
+                            task.wait(0.5)
+                        end
+                        if pcall(fireproximityprompt, child) then
+                            totalClaim = totalClaim + 1
+                        end
+                        task.wait(0.5)
+                    end
+                end
+            end
+        end
+        task.wait(0.3)
+    end
+
+    if lastCFrame then SH.teleportTo(lastCFrame) end
+    S.StarCraterActive = false
+    SH.notify("Star Crater", "Claimed " .. totalClaim .. " prompts", 3)
+end
+
+-- =====================================================
+-- [10] WEBHOOK
+-- =====================================================
+SH.httpRequest = function(opts)
+    local req = (syn and syn.request) or (http and http.request) or request or http_request
+    if type(req) == "function" then return req(opts) end
+    return nil
+end
+
+SH.sendWebhook = function(title, description, color)
+    if not C.WebhookEnabled then return end
+    if not C.WebhookURL or C.WebhookURL == "" then return end
+    if not tostring(C.WebhookURL):find("discord%.com/api/webhooks") then return end
+    if tick() - (C.WebhookLastSent or 0) < (C.WebhookDelay or 3) then return end
+    C.WebhookLastSent = tick()
+
+    local content = ""
+    if C.WebhookMentions and C.WebhookDiscordID ~= "" then
+        content = "<@" .. tostring(C.WebhookDiscordID) .. ">"
+    end
+
+    local body = HttpService:JSONEncode({
+        content = content,
+        username = "SolanaHub",
+        embeds = {{
+            title = title or "SolanaHub Fisch",
+            description = description or "",
+            color = color or 9737471,
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+            footer = { text = "SolanaHub · " .. LocalPlayer.Name },
+        }},
+    })
+
+    task.spawn(function()
+        pcall(function()
+            SH.httpRequest({
+                Url = C.WebhookURL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body,
+            })
+        end)
+    end)
+end
+
+SH.testWebhook = function()
+    if not C.WebhookURL or C.WebhookURL == "" then
+        SH.notify("Webhook", "Enter a webhook URL first", 3)
+        return
+    end
+    if not tostring(C.WebhookURL):find("discord%.com/api/webhooks") then
+        SH.notify("Webhook", "URL must be a Discord webhook", 3)
+        return
+    end
+    C.WebhookLastSent = 0
+    SH.sendWebhook("✅ Test", "Webhook connected!\n**Player:** " .. LocalPlayer.Name, 5763719)
+    SH.notify("Webhook", "Test message sent", 3)
+end
+
+-- =====================================================
+-- [11] SERVER FINDER
+-- =====================================================
+SH.sfGet = function(url)
+    local req = (syn and syn.request) or (http and http.request) or request or http_request
+    if type(req) == "function" then
+        local ok, res = pcall(function() return req({ Url = url, Method = "GET" }) end)
+        if ok and res then
+            local body = res.Body or res.body
+            local code = res.StatusCode or res.Status or res.status_code
+            if body and (not code or code == 200) then return body end
+        end
+    end
+    local ok2, body2 = pcall(function() return game:HttpGet(url) end)
+    if ok2 then return body2 end
+    return nil
+end
+
+SH.fetchServers = function()
+    local body = SH.sfGet(D.ServerFinderURL)
+    if not body or body == "" or body == "null" then
+        S.ServerFinderCache = {}
+        return false, "Failed to fetch or empty response"
+    end
+    local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
+    if not ok or type(data) ~= "table" then
+        return false, "Invalid JSON"
+    end
+    local list = {}
+    for jobId, info in pairs(data) do
+        if type(info) == "table" then
+            info.jobId = info.jobId or jobId
+            table.insert(list, info)
+        end
+    end
+    table.sort(list, function(a, b)
+        return (tonumber(a.playerCount) or 0) > (tonumber(b.playerCount) or 0)
+    end)
+    S.ServerFinderCache = list
+    return true, list
+end
+
+SH.formatServer = function(info)
+    local job = tostring(info.jobId or "?")
+    local pc = tostring(info.playerCount or "?")
+    local maxp = tostring(info.maxPlayers or info.MaxPlayers or "?")
+    local weather = tostring(info.weather or info.worldStatus or "-")
+    local uptime = tostring(info.uptime or info.uptimeSeconds or "-")
+    local events = info.events
+    local evStr = "-"
+    if type(events) == "table" then
+        local t = {}
+        for k, v in pairs(events) do
+            if type(k) == "string" and (v == true or v == 1) then
+                table.insert(t, k)
+            elseif type(v) == "string" then
+                table.insert(t, v)
+            end
+        end
+        if #t > 0 then evStr = table.concat(t, ", ") end
+    elseif type(events) == "string" then
+        evStr = events
+    end
+    local cosmic = info.cosmicCount or info.starfall or ""
+    local line = string.format("[%s/%s] %s\n  Events: %s\n  Weather: %s | Uptime: %s",
+        pc, maxp, job:sub(1, 12) .. (job:len() > 12 and "…" or ""), evStr, weather, tostring(uptime))
+    if cosmic ~= "" and cosmic ~= 0 then
+        line = line .. " | Cosmic/Star: " .. tostring(cosmic)
+    end
+    return line, job, evStr
+end
+
+SH.buildServerText = function(filter)
+    filter = string.lower(tostring(filter or S.ServerFinderFilter or ""))
+    if #S.ServerFinderCache == 0 then
+        return "No data yet.\nPress Load Servers."
+    end
+    local lines, shown = {}, 0
+    for _, info in ipairs(S.ServerFinderCache) do
+        local line, job, evStr = SH.formatServer(info)
+        local hay = string.lower(line .. " " .. tostring(evStr) .. " " .. tostring(job))
+        if filter == "" or hay:find(filter, 1, true) then
+            table.insert(lines, line)
+            table.insert(lines, "────────────")
+            shown = shown + 1
+            if shown >= 25 then break end
+        end
+    end
+    if shown == 0 then
+        return "No servers match the filter:\n" .. filter
+    end
+    return "Servers: " .. shown .. " (max 25)\n────────────\n" .. table.concat(lines, "\n")
+end
+
+SH.firstFilteredJobId = function(filter)
+    filter = string.lower(tostring(filter or S.ServerFinderFilter or ""))
+    for _, info in ipairs(S.ServerFinderCache) do
+        local line, job, evStr = SH.formatServer(info)
+        local hay = string.lower(line .. " " .. tostring(evStr) .. " " .. tostring(job))
+        if filter == "" or hay:find(filter, 1, true) then
+            return tostring(info.jobId or job)
+        end
+    end
+    return nil
+end
+
+-- =====================================================
+-- [12] CURRENT EVENTS
+-- =====================================================
+SH.getCycleText = function()
+    local label = PlayerGui:FindFirstChild("hud")
+        and PlayerGui.hud:FindFirstChild("safezone")
+        and PlayerGui.hud.safezone:FindFirstChild("worldstatuses")
+        and PlayerGui.hud.safezone.worldstatuses:FindFirstChild("4_cycle")
+        and PlayerGui.hud.safezone.worldstatuses["4_cycle"]:FindFirstChild("label")
+    if label and label:IsA("TextLabel") then return label.Text end
+    return "Unknown"
+end
+
+SH.buildEventText = function(showAll)
+    local zones = Workspace:FindFirstChild("zones")
+    local fishingZones = zones and zones:FindFirstChild("fishing")
+    local lines = { "Cycle: " .. SH.getCycleText(), "────────────" }
+    local activeCount = 0
+
+    for _, eventName in ipairs(D.EventList) do
+        local isActive = fishingZones and fishingZones:FindFirstChild(eventName) ~= nil
+        if isActive then
+            activeCount = activeCount + 1
+            table.insert(lines, "✅ " .. eventName)
+        elseif showAll then
+            table.insert(lines, "❌ " .. eventName)
+        end
+    end
+
+    if activeCount == 0 then
+        table.insert(lines, "No active events")
+    end
+    table.insert(lines, "────────────")
+    table.insert(lines, "Active: " .. activeCount .. " / " .. #D.EventList)
+    return table.concat(lines, "\n")
+end
+
+SH.refreshEventText = function(showAll)
+    if not SH.EventPara then return end
+    local text = SH.buildEventText(showAll)
+    pcall(function()
+        if SH.EventPara.Set then
+            SH.EventPara:Set({ Name = "Fisch Events", Content = text })
+        elseif SH.EventPara.SetContent then
+            SH.EventPara:SetContent(text)
+        end
+    end)
+end
+
+-- =====================================================
+-- [13] MOVEMENT
+-- =====================================================
+SH.toggleFly = function(state)
+    C.Fly = state
+    local hrp = SH.getHRP()
+    local hum = SH.getHum()
+    if not hrp or not hum then return end
+
+    if state then
+        S.FlyBV = Instance.new("BodyVelocity")
+        S.FlyBV.MaxForce = Vector3.new(9e4, 9e4, 9e4)
+        S.FlyBV.Velocity = Vector3.zero
+        S.FlyBV.Parent = hrp
+
+        S.FlyBG = Instance.new("BodyGyro")
+        S.FlyBG.MaxTorque = Vector3.new(9e4, 9e4, 9e4)
+        S.FlyBG.P = 1e4
+        S.FlyBG.Parent = hrp
+
+        S.FlyConn = RunService.RenderStepped:Connect(function()
+            if not C.Fly or not hrp.Parent then return end
+            local cam = Workspace.CurrentCamera
+            local dir = Vector3.zero
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.yAxis end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.yAxis end
+            if dir.Magnitude > 0 then dir = dir.Unit end
+            S.FlyBV.Velocity = dir * C.FlySpeed
+            S.FlyBG.CFrame = cam.CFrame
+            hum.PlatformStand = true
+        end)
+    else
+        if S.FlyConn then S.FlyConn:Disconnect(); S.FlyConn = nil end
+        if S.FlyBV then S.FlyBV:Destroy(); S.FlyBV = nil end
+        if S.FlyBG then S.FlyBG:Destroy(); S.FlyBG = nil end
+        if hum then hum.PlatformStand = false end
+    end
+end
+
+SH.toggleNoclip = function(state)
+    C.Noclip = state
+    if S.NoclipConn then S.NoclipConn:Disconnect(); S.NoclipConn = nil end
+    if state then
+        S.NoclipConn = RunService.Stepped:Connect(function()
+            local char = LocalPlayer.Character
+            if not char then return end
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = false end
+            end
+        end)
+    end
+end
+
+SH.toggleInfiniteJump = function(state)
+    C.InfiniteJump = state
+    if S.JumpConn then S.JumpConn:Disconnect(); S.JumpConn = nil end
+    if state then
+        S.JumpConn = UserInputService.JumpRequest:Connect(function()
+            local hum = SH.getHum()
+            if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+        end)
+    end
+end
+
+SH.toggleWalkspeed = function(state)
+    C.WalkspeedEnabled = state
+    if S.WalkspeedConn then S.WalkspeedConn:Disconnect(); S.WalkspeedConn = nil end
+    if state then
+        S.WalkspeedConn = RunService.Heartbeat:Connect(function()
+            local hum = SH.getHum()
+            if hum then hum.WalkSpeed = C.WalkspeedValue end
+        end)
+    else
+        local hum = SH.getHum()
+        if hum then hum.WalkSpeed = 16 end
+    end
+end
+
+SH.toggleAntiSwim = function(state)
+    C.AntiSwim = state
+    if S.AntiSwimConn then S.AntiSwimConn:Disconnect(); S.AntiSwimConn = nil end
+    if state then
+        S.AntiSwimConn = RunService.Heartbeat:Connect(function()
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+                pcall(function() char:SetAttribute("Oxygen", 100) end)
+            end
+        end)
+    else
+        local hum = SH.getHum()
+        if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true) end
+    end
+end
+
+-- =====================================================
+-- [14] VISUAL & ESP
+-- =====================================================
+S.OrigLighting = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+}
+
+SH.toggleFullBright = function(state)
+    C.FullBright = state
+    local O = S.OrigLighting
+    if state then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 1e5
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    else
+        Lighting.Brightness = O.Brightness
+        Lighting.ClockTime = O.ClockTime
+        Lighting.FogEnd = O.FogEnd
+        Lighting.GlobalShadows = O.GlobalShadows
+        Lighting.OutdoorAmbient = O.OutdoorAmbient
+    end
+end
+
+SH.togglePotato = function(state)
+    C.PotatoMode = state
+    local O = S.OrigLighting
+    pcall(function()
+        if state then
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 200
+        else
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+            Lighting.GlobalShadows = O.GlobalShadows
+            Lighting.FogEnd = O.FogEnd
+        end
+    end)
+end
+
+SH.PlayerESPFolder = Instance.new("Folder")
+SH.PlayerESPFolder.Name = "SolanaHubPlrESP"
+pcall(function() SH.PlayerESPFolder.Parent = game:GetService("CoreGui") end)
+
+SH.NPCESPFolder = Instance.new("Folder")
+SH.NPCESPFolder.Name = "SolanaHubNPCESP"
+pcall(function() SH.NPCESPFolder.Parent = game:GetService("CoreGui") end)
+
+SH.makeESPLabel = function(adornee, parent, text, color, size, offset)
+    local bb = Instance.new("BillboardGui")
+    bb.Adornee = adornee
+    bb.Size = size
+    bb.StudsOffset = offset
+    bb.AlwaysOnTop = true
+    bb.Parent = parent
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = color
+    lbl.TextStrokeTransparency = 0.4
+    lbl.TextScaled = true
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Parent = bb
+end
+
+SH.togglePlayerESP = function(state)
+    C.PlayerESP = state
+    SH.PlayerESPFolder:ClearAllChildren()
+    if not state then return end
+    task.spawn(function()
+        while C.PlayerESP do
+            SH.PlayerESPFolder:ClearAllChildren()
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character then
+                    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        SH.makeESPLabel(hrp, SH.PlayerESPFolder, plr.DisplayName, Color3.fromRGB(0, 255, 128),
+                            UDim2.new(0, 100, 0, 30), Vector3.new(0, 3, 0))
+                    end
+                end
+            end
+            task.wait(1.5)
+        end
+        SH.PlayerESPFolder:ClearAllChildren()
+    end)
+end
+
+SH.toggleNPCESP = function(state)
+    C.NPCESP = state
+    SH.NPCESPFolder:ClearAllChildren()
+    if not state then return end
+    task.spawn(function()
+        while C.NPCESP do
+            SH.NPCESPFolder:ClearAllChildren()
+            local folder = Workspace:FindFirstChild("npcs") or Workspace:FindFirstChild("NPCs")
+                or (Workspace:FindFirstChild("world") and Workspace.world:FindFirstChild("npcs"))
+            if folder then
+                for _, npc in ipairs(folder:GetChildren()) do
+                    local hrp = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+                    if hrp then
+                        SH.makeESPLabel(hrp, SH.NPCESPFolder, npc.Name, Color3.fromRGB(255, 200, 50),
+                            UDim2.new(0, 90, 0, 28), Vector3.new(0, 2.5, 0))
+                    end
+                end
+            end
+            task.wait(2)
+        end
+        SH.NPCESPFolder:ClearAllChildren()
+    end)
+end
+
+-- =====================================================
+-- [15] PROTECTION
+-- =====================================================
+SH.toggleAntiStaff = function(state)
+    C.AntiStaff = state
+    if S.AntiStaffConn then S.AntiStaffConn:Disconnect(); S.AntiStaffConn = nil end
+    if state then
+        local function checkStaff(plr)
+            if plr == LocalPlayer or not C.AntiStaff then return end
+            local name = string.lower(plr.Name .. " " .. (plr.DisplayName or ""))
+            for _, kw in ipairs(D.StaffKeywords) do
+                if name:find(kw, 1, true) then
+                    SH.notify("Anti Staff", "Possible staff member: " .. plr.Name, 5)
+                    pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
+                    return
+                end
+            end
+        end
+        for _, p in ipairs(Players:GetPlayers()) do checkStaff(p) end
+        S.AntiStaffConn = Players.PlayerAdded:Connect(checkStaff)
+    end
+end
+
+SH.toggleHideMinigame = function(state)
+    C.HideMinigameUI = state
+    if S.HideMGConn then S.HideMGConn:Disconnect(); S.HideMGConn = nil end
+    if state then
+        S.HideMGConn = RunService.Heartbeat:Connect(function()
+            local reel = PlayerGui:FindFirstChild("reel")
+            if reel then reel.Enabled = false end
+        end)
+    end
+end
+
+SH.toggleBypassGPS = function(state)
+    C.BypassGPS = state
+    pcall(function()
+        local fishingPath = Workspace:FindFirstChild("zones") and Workspace.zones:FindFirstChild("fishing")
+        if not fishingPath then return end
+        for _, folder in ipairs(fishingPath:GetChildren()) do
+            for _, name in ipairs({ "gps", "GPS", "radar1", "radar2" }) do
+                local obj = folder:FindFirstChild(name)
+                if obj then
+                    if obj:IsA("BoolValue") then obj.Value = state end
+                    pcall(function() obj.Enabled = state end)
+                end
+            end
+        end
+    end)
+end
+
+SH.toggleAutoFriend = function(state)
+    C.AutoFriend = state
+    if S.FriendConn then S.FriendConn:Disconnect(); S.FriendConn = nil end
+    if state then
+        local function req(plr)
+            if plr ~= LocalPlayer then pcall(function() LocalPlayer:RequestFriendship(plr) end) end
+        end
+        S.FriendConn = Players.PlayerAdded:Connect(req)
+        for _, plr in ipairs(Players:GetPlayers()) do req(plr) end
+    end
+end
+
+SH.toggleCensor = function(state)
+    C.CensorUsername = state
+    pcall(function()
+        local hrp = SH.getHRP()
+        local userFolder = hrp and hrp:FindFirstChild("user")
+        local nameLbl = userFolder and userFolder:FindFirstChild("user")
+        if not nameLbl or not nameLbl:IsA("TextLabel") then return end
+        if state then
+            S.CensorOriginal = nameLbl.Text
+            nameLbl.Text = "████████"
+        elseif S.CensorOriginal then
+            nameLbl.Text = S.CensorOriginal
+        end
+    end)
+end
+
+SH.applyAvatar = function(username)
+    if not username or username == "" then
+        SH.notify("Avatar", "Enter a username first", 3)
+        return
+    end
+    task.spawn(function()
+        local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
+        if not ok or not userId then
+            SH.notify("Avatar", "Username not found: " .. tostring(username), 3)
+            return
+        end
+        local ok2, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(userId) end)
+        if not ok2 or not desc then
+            SH.notify("Avatar", "Failed to load appearance", 3)
+            return
+        end
+        local hum = SH.getHum()
+        if not hum then
+            SH.notify("Avatar", "Character not ready", 3)
+            return
+        end
+        local ok3, err = pcall(function() hum:ApplyDescription(desc) end)
+        if ok3 then
+            SH.notify("Avatar", "Applied: " .. username, 3)
+        else
+            SH.notify("Avatar", "Failed to apply: " .. tostring(err), 3)
+        end
+    end)
+end
+
+-- =====================================================
+-- [16] HIDE IDENTITY & RADAR
+-- =====================================================
+SH.saveIdentity = function()
+    if S.IdentitySaved then return end
+    local hrp = SH.getHRP()
+    local userFolder = hrp and hrp:FindFirstChild("user")
+    if userFolder then
+        local n = userFolder:FindFirstChild("user")
+        local l = userFolder:FindFirstChild("level")
+        if n and n:IsA("TextLabel") then S.IdentityOriginalName = n.Text end
+        if l and l:IsA("TextLabel") then S.IdentityOriginalLevel = l.Text end
+        S.IdentitySaved = true
+    end
+end
+
+SH.toggleIdentity = function(state)
+    local hrp = SH.getHRP()
+    local userFolder = hrp and hrp:FindFirstChild("user")
+    if not userFolder then return end
+
+    local nameLbl = userFolder:FindFirstChild("user")
+    local levelLbl = userFolder:FindFirstChild("level")
+    local titleLbl = userFolder:FindFirstChild("title")
+
+    if state then
+        SH.saveIdentity()
+        if nameLbl then nameLbl.Text = C.CustomName end
+        if levelLbl then levelLbl.Text = C.CustomLevel end
+        if titleLbl then
+            titleLbl.Text = "SolanaHub"
+            titleLbl.Visible = true
+        end
+    elseif S.IdentitySaved then
+        if nameLbl then nameLbl.Text = S.IdentityOriginalName end
+        if levelLbl then levelLbl.Text = S.IdentityOriginalLevel end
+        if titleLbl then titleLbl.Visible = false end
+    end
+end
+
+SH.toggleRadar = function(state)
+    if S.RadarLoop then
+        task.cancel(S.RadarLoop)
+        S.RadarLoop = nil
+    end
+    local function setRadar(on)
+        local fishingPath = Workspace:FindFirstChild("zones") and Workspace.zones:FindFirstChild("fishing")
+        if not fishingPath then return end
+        for _, folder in ipairs(fishingPath:GetChildren()) do
+            for _, name in ipairs({ "radar1", "radar2" }) do
+                local obj = folder:FindFirstChild(name)
+                if obj then
+                    pcall(function()
+                        if obj:IsA("BoolValue") then obj.Value = on end
+                        obj.Enabled = on
+                    end)
+                end
+            end
+        end
+    end
+    if state then
+        S.RadarLoop = task.spawn(function()
+            while true do
+                setRadar(true)
+                task.wait(1)
+            end
+        end)
+    else
+        setRadar(false)
+    end
+end
+
+-- =====================================================
+-- [17] WALK ON WATER, FREEZE, ANTI AFK, FPS, SCREENS
+-- =====================================================
+SH.toggleWalkOnWater = function(Value)
+    if S.WowConn then S.WowConn:Disconnect(); S.WowConn = nil end
+    if S.WaterPart then S.WaterPart:Destroy(); S.WaterPart = nil end
+    if not Value then return end
+
+    S.WaterPart = Instance.new("Part")
+    S.WaterPart.Name = "SolanaHub_WalkOnWater"
+    S.WaterPart.Size = Vector3.new(20, 1, 20)
+    S.WaterPart.Transparency = 1
+    S.WaterPart.Anchored = true
+    S.WaterPart.CanCollide = true
+    S.WaterPart.Parent = Workspace
+
+    S.WowConn = RunService.Heartbeat:Connect(function()
+        local root = SH.getHRP()
+        local hum = SH.getHum()
+        if not root or not hum or not S.WaterPart then return end
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Include
+        params.FilterDescendantsInstances = { Workspace.Terrain }
+        params.IgnoreWater = false
+        local ray = Workspace:Raycast(root.Position + Vector3.new(0, 10, 0), Vector3.new(0, -500, 0), params)
+        if ray and ray.Material == Enum.Material.Water then
+            S.WaterPart.CFrame = CFrame.new(root.Position.X, ray.Position.Y - 0.5, root.Position.Z)
+        else
+            S.WaterPart.CFrame = CFrame.new(0, -1000, 0)
+        end
+    end)
+end
+
+SH.toggleAntiAFK = function(Value)
+    if S.AntiAFKConn then S.AntiAFKConn:Disconnect(); S.AntiAFKConn = nil end
+    if Value then
+        S.AntiAFKConn = LocalPlayer.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+end
+
+SH.toggleFreeze = function(Value)
+    if S.FreezeConn then S.FreezeConn:Disconnect(); S.FreezeConn = nil end
+    if Value then
+        local hrp = SH.getHRP()
+        if hrp then
+            S.FrozenCFrame = hrp.CFrame
+            S.FreezeConn = RunService.Heartbeat:Connect(function()
+                local root = SH.getHRP()
+                if root and S.FrozenCFrame then root.CFrame = S.FrozenCFrame end
+            end)
+        end
+    else
+        S.FrozenCFrame = nil
+    end
+end
+
+SH.toggleFPS = function(Value)
+    pcall(function()
+        settings().Rendering.QualityLevel = Value and Enum.QualityLevel.Level01 or Enum.QualityLevel.Automatic
+    end)
+end
+
+SH.destroyScreenSaver = function()
+    if S.ScreenSaverGui then
+        pcall(function() S.ScreenSaverGui:Destroy() end)
+        S.ScreenSaverGui = nil
+    end
+end
+
+SH.setScreenSaver = function(enabled, mode)
+    SH.destroyScreenSaver()
+    if not enabled then return end
+    local color = (mode == "White") and Color3.new(1, 1, 1) or Color3.new(0, 0, 0)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
+    if not pg then return end
+
+    S.ScreenSaverGui = Instance.new("ScreenGui")
+    S.ScreenSaverGui.Name = "SolanaHubScreenSaver"
+    S.ScreenSaverGui.IgnoreGuiInset = true
+    S.ScreenSaverGui.ResetOnSpawn = false
+    S.ScreenSaverGui.DisplayOrder = 99999
+    S.ScreenSaverGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = color
+    frame.BorderSizePixel = 0
+    frame.Parent = S.ScreenSaverGui
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 40)
+    label.Position = UDim2.new(0, 0, 0.5, -20)
+    label.BackgroundTransparency = 1
+    label.Text = "SolanaHub AFK · " .. mode .. " Screen\nPress RightShift to open UI"
+    label.TextColor3 = (mode == "White") and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = frame
+
+    S.ScreenSaverGui.Parent = pg
+end
+
+SH.toggleBlackScreen = function(state)
+    C.BlackScreen = state
+    if state then
+        C.WhiteScreen = false
+        SH.setToggle("WhiteScr", false)
+        SH.setScreenSaver(true, "Black")
+    elseif not C.WhiteScreen then
+        SH.destroyScreenSaver()
+    end
+end
+
+SH.toggleWhiteScreen = function(state)
+    C.WhiteScreen = state
+    if state then
+        C.BlackScreen = false
+        SH.setToggle("BlackScr", false)
+        SH.setScreenSaver(true, "White")
+    elseif not C.BlackScreen then
+        SH.destroyScreenSaver()
+    end
+end
+
+-- =====================================================
+-- [18] SERVER TOOLS
+-- =====================================================
+SH.copyJobId = function()
+    local id = tostring(game.JobId)
+    if setclipboard then
+        setclipboard(id)
+        SH.notify("Server", "JobId copied", 2)
+    else
+        SH.notify("Server", "JobId: " .. id, 5)
+    end
+end
+
+SH.copyPlaceId = function()
+    local id = tostring(game.PlaceId)
+    if setclipboard then
+        setclipboard(id)
+        SH.notify("Server", "PlaceId copied", 2)
+    else
+        SH.notify("Server", "PlaceId: " .. id, 3)
+    end
+end
+
+SH.joinJobId = function(jobId)
+    jobId = tostring(jobId or C.PrivateServerJobId or ""):gsub("%s+", "")
+    if jobId == "" then
+        SH.notify("Server", "Enter a JobId first", 3)
+        return
+    end
+    SH.notify("Server", "Joining JobId...", 2)
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
+    end)
+end
+
+SH.rejoinSameServer = function()
+    SH.notify("Server", "Rejoining the same server...", 2)
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+    end)
+end
+
+SH.serverHop = function()
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(
+            "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        ))
+    end)
+    if ok and result and result.data then
+        for _, s in ipairs(result.data) do
+            if s.id ~= game.JobId and s.playing < s.maxPlayers then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
+                return
+            end
+        end
+        SH.notify("Server", "No other available servers", 3)
+    else
+        SH.notify("Server", "Failed to load server list", 3)
+    end
+end
+
+-- =====================================================
+-- [19] BACKGROUND CONNECTIONS
+-- =====================================================
+SH.startConnections = function()
+    task.spawn(function()
+        local net = ReplicatedStorage:WaitForChild("packages", 10)
+        net = net and net:WaitForChild("Net", 10)
+        if net then
+            S.SpearRemote = net:FindFirstChild("RF/SpearFishing/Minigame")
+            S.RemoteShake = net:FindFirstChild("RE/LureShake/Shake")
+        end
+        local ev = SH.getEvents()
+        if ev then S.SellEvent = ev:FindFirstChild("SellAll") end
+    end)
+
+    task.spawn(function()
+        local ok, DC = pcall(function()
+            return require(ReplicatedStorage.client.legacyControllers.DataController)
+        end)
+        if ok then S.StorageDataController = DC end
+    end)
+
+    LocalPlayer.CharacterAdded:Connect(function()
+        S.IdentitySaved = false
+        task.wait(2)
+        SH.saveIdentity()
+        if C.HideIdentity then SH.toggleIdentity(true) end
+    end)
+end
+
+-- =====================================================
+-- [20] UI
+-- =====================================================
+SH.buildUI = function()
+    local window = ModernV2:Window({
+        Title = "SolanaHub",
+        Content = "Fisch",
+        Image = LOGO,
+        Logo = "rbxassetid://" .. LOGO,
+        Color = ACCENT,
+        Uitransparent = 0.1,
+        Size = UDim2.fromOffset(560, 380),
+        MinSize = UDim2.fromOffset(480, 300),
+        MaxSize = UDim2.fromOffset(800, 560),
+        Resizable = true,
+        ShowUser = true,
+        Search = true,
+        ConfigEnabled = true,
+        NotifyOnCallbackError = false,
+        Loadingscreen = false,
+        Enable3DRenderer = false,
+        Keybind = "RightShift",
+        Config = {
+            ConfigFolder = "SolanaHubFisch",
+            AutoSaveFile = "SolanaHub_Fisch.lua",
+            AutoSave = false,
+            AutoLoad = false,
+            Overwrite = true,
+            Format = "JSON",
+            ShowAutoSaveToggle = true,
+            TextGradient = true,
+        },
+    })
+    SH.Window = window
+
+    local MenuIcon = ModernV2:CreateMenuIcon({
+        Image = "rbxassetid://" .. LOGO,
+        Size = 48,
+        IconColor = Color3.fromRGB(255, 255, 255),
+        BGColor = Color3.fromRGB(8, 8, 13),
+        StrokeColor = ACCENT,
+        StrokeThick = 1.5,
+        Draggable = true,
+    })
+    if MenuIcon and window.AttachMenuIcon then
+        pcall(function() window:AttachMenuIcon(MenuIcon) end)
+    end
+
+    pcall(function()
+        window:SetAccount({
+            Username = LocalPlayer.DisplayName,
+            Profile = ModernV2.UserProfile,
+            Expires = "Active",
+        })
+    end)
+
+    pcall(function()
+        window:CreateHomeTab({
+            Name = "Dashboard",
+            Icon = "lucide:layout-dashboard",
+            Content = "SolanaHub · Fisch",
+            DiscordInvite = "https://discord.gg/solanahub",
+            SupportedExecutors = { "Delta", "Synapse X", "Krnl", "Codex", "Arceus X" },
+            UnsupportedExecutors = { "Roblox Studio" },
+            Segments = {
+                Details = { Text = "Details", Icon = "lucide:grid-2x2" },
+                Script = { Text = "Logs", Icon = "lucide:code" },
+                UI = { Text = "UI", Icon = "lucide:file-text", Show = true },
+            },
+            Changelog = {
+                { Title = "SolanaHub", Date = "v2.0", Description = "Clean rebuild, full features" },
+            },
+            UIChangelog = {
+                { Title = "UI", Date = "v2", Description = "Solana Red theme" },
+            },
+        })
+    end)
+
+    local function addT(sec, name, flag, default, cb)
+        local t = sec:AddToggle({ Name = name, Default = default or false, Flag = flag, Callback = cb })
+        SH.Toggles[flag] = t
+        return t
+    end
+    local function addS(sec, name, flag, def, minv, maxv, cb, round)
+        return sec:AddSlider({ Name = name, Default = def, Min = minv, Max = maxv, Rounding = round or 0, Flag = flag, Callback = cb })
+    end
+    local function addB(sec, name, icon, cb)
+        return sec:AddButton({ Name = name, Icon = icon or "lucide:circle", Callback = cb })
+    end
+    local function addD(sec, name, flag, def, values, cb, search)
+        return sec:AddDropdown({ Name = name, Default = def, Values = values, Flag = flag, Callback = cb, Search = search or false })
+    end
+
+    -- ===== EVENT INFO =====
+    local EventsTab = window:AddTab({ Name = "Event Info", Icon = "lucide:megaphone", Type = "Double" })
+    local ev1 = EventsTab:AddSection({ Name = "Server Events", Position = "Left" })
+    local ev2 = EventsTab:AddSection({ Name = "Controls", Position = "Right" })
+    local ev3 = EventsTab:AddSection({ Name = "Server Finder", Position = "Center" })
+
+    SH.EventPara = ev1:AddParagraph({ Name = "Fisch Events", Content = SH.buildEventText(false) })
+
+    addB(ev2, "Refresh Active", "lucide:refresh-cw", function()
+        SH.refreshEventText(false)
+        SH.notify("Events", "Refreshed (active only)", 2)
+    end)
+    addB(ev2, "Show All Events", "lucide:list", function()
+        SH.refreshEventText(true)
+        SH.notify("Events", "Full event list loaded", 2)
+    end)
+    ev2:AddParagraph({
+        Name = "Info",
+        Content = "Live data from the fishing zones.\nRefreshes every 15 seconds.",
+    })
+
+    local sfPara = ev3:AddParagraph({
+        Name = "Available Servers",
+        Content = "Press Load Servers.\nSource: MengHub",
+    })
+    local function setSfPara(text)
+        pcall(function()
+            if sfPara.Set then
+                sfPara:Set({ Name = "Available Servers", Content = text })
+            elseif sfPara.SetContent then
+                sfPara:SetContent(text)
+            end
+        end)
+    end
+
+    ev3:AddTextInput({
+        Name = "Search",
+        Placeholder = "kraken / blue moon",
+        Flag = "SFFilter",
+        Callback = function(t)
+            S.ServerFinderFilter = t or ""
+            setSfPara(SH.buildServerText(S.ServerFinderFilter))
+        end,
+    })
+    addB(ev3, "Load Servers", "lucide:download", function()
+        setSfPara("Loading...")
+        task.spawn(function()
+            local ok, res = SH.fetchServers()
+            if ok then
+                setSfPara(SH.buildServerText(S.ServerFinderFilter))
+                SH.notify("Server Finder", "Loaded " .. #S.ServerFinderCache .. " servers", 3)
+            else
+                setSfPara("Failed: " .. tostring(res))
+                SH.notify("Server Finder", "Failed to load servers", 3)
+            end
+        end)
+    end)
+    addB(ev3, "Refresh List", "lucide:refresh-cw", function()
+        setSfPara(SH.buildServerText(S.ServerFinderFilter))
+    end)
+    ev3:AddTextInput({
+        Name = "JobId",
+        Placeholder = "Empty = first result",
+        Flag = "SFJob",
+        Callback = function(t) C.PrivateServerJobId = t or "" end,
+    })
+    addB(ev3, "Join Server", "lucide:log-in", function()
+        local jid = C.PrivateServerJobId
+        if not jid or jid == "" then
+            jid = SH.firstFilteredJobId(S.ServerFinderFilter)
+        end
+        if not jid or jid == "" then
+            SH.notify("Server Finder", "No JobId available", 3)
+            return
+        end
+        SH.notify("Server Finder", "Joining...", 2)
+        pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, jid, LocalPlayer) end)
+    end)
+    addB(ev3, "Copy First Result", "lucide:copy", function()
+        local jid = SH.firstFilteredJobId(S.ServerFinderFilter)
+        if jid and setclipboard then
+            setclipboard(jid)
+            SH.notify("Server Finder", "JobId copied", 2)
+        else
+            SH.notify("Server Finder", jid and tostring(jid) or "No results", 3)
+        end
+    end)
+
+    -- ===== HOME =====
+    local HomeTab = window:AddTab({ Name = "Home", Icon = "lucide:fish", Type = "Double" })
+    local h1 = HomeTab:AddSection({ Name = "Auto Fishing", Position = "Left" })
+    local h2 = HomeTab:AddSection({ Name = "Reel · Snap", Position = "Right" })
+    local h3 = HomeTab:AddSection({ Name = "Spear · Sell", Position = "Center" })
+
+    h1:AddParagraph({ Name = "Shortcut", Content = "Toggle UI: RightShift" })
+    addT(h1, "Auto Cast", "AutoCast", false, function(v) C.AutoCast = v end)
+    addT(h1, "Auto Shake", "AutoShake", false, function(v) C.AutoShake = v end)
+    addS(h1, "Delay", "ShakeDel", 300, 50, 1000, function(v) C.ShakeDelay = v end)
+    addT(h1, "Instant Bobber", "InstBob", false, function(v) C.InstantBobber = v end)
+    addT(h1, "Auto Equip Rod", "AutoEq", false, function(v) C.AutoEquip = v end)
+    addD(h1, "Mode", "Mode", "Legit", { "Legit", "Fast" }, function(v) C.Mode = v end)
+
+    addT(h2, "Snap Reel", "Snap", false, function(v) C.SnapReel = v end)
+    addD(h2, "Fish", "SnapName", "None", D.SnapFishList, function(v) C.SnapFishName = v end, true)
+    addD(h2, "Shiny", "SnapShiny", "None", D.ShinyOptions, function(v) C.SnapShinyType = v end)
+    addD(h2, "Mutation", "SnapMut", "None", D.SnapMutationList, function(v) C.SnapMutation = v end, true)
+    addD(h2, "Rarity", "SnapRarity", "None", D.RarityList, function(v) C.SnapRarity = v end)
+
+    addT(h3, "Auto Sell", "AutoSell", false, function(v)
+        C.AutoSell = v
+        if v then SH.runAutoSell() end
+    end)
+    addS(h3, "Delay", "SellInt", 5, 1, 60, function(v) C.SellInterval = v end)
+    addD(h3, "Location", "SpearLoc", C.AutoSpearLocation, D.SpearLocNames, function(v)
+        C.AutoSpearLocation = v
+    end)
+    addT(h3, "Auto Spear", "AutoSpear", false, function(v)
+        C.AutoSpear = v
+        if v then SH.runAutoSpear() end
+    end)
+
+    -- ===== FARM+ =====
+    local FarmTab = window:AddTab({ Name = "Farm+", Icon = "lucide:sparkles", Type = "Double" })
+    local f1 = FarmTab:AddSection({ Name = "Totem", Position = "Left" })
+    local f2 = FarmTab:AddSection({ Name = "Appraise · Sell · Favorite", Position = "Right" })
+    local f3 = FarmTab:AddSection({ Name = "Auto Enchant", Position = "Center" })
+
+    addT(f1, "Auto Totem", "AutoTotem", false, function(v)
+        C.AutoTotem = v
+        if v then SH.runAutoTotem() end
+    end)
+    addS(f1, "Delay", "TotemDel", 60, 10, 300, function(v) C.TotemDelay = v end)
+    addD(f1, "Day", "TotemDay", "None", D.TotemOptions, function(v) C.TotemDay = v end, true)
+    addD(f1, "Night", "TotemNight", "None", D.TotemOptions, function(v) C.TotemNight = v end, true)
+    addT(f1, "Auto Buy Totem", "AutoBuyTotem", false, function(v)
+        C.AutoBuyTotem = v
+        if v then SH.runAutoBuyTotem() end
+    end)
+    addD(f1, "Totem", "BuyTotemSel", C.SelectedTotem, D.TotemListBuy, function(v)
+        C.SelectedTotem = v
+    end)
+    addS(f1, "Delay", "BuyTotemInt", 5, 1, 60, function(v) C.TotemInterval = v end)
+    f1:AddParagraph({
+        Name = "Totem Prices",
+        Content = "2,000C$: Sundial, Tempest,\nWindset, Smokescreen\n75,000C$: Meteor\n200,000C$: Eclipse\n500,000C$: Aurora",
+    })
+
+    addT(f2, "Auto Appraise", "AutoApp", false, function(v)
+        C.AutoAppraise = v
+        if v then SH.runAutoAppraise() end
+    end)
+    addD(f2, "Shiny", "AppShiny", "None", D.ShinyOptions, function(v) C.ShinyType = v end)
+    f2:AddTextInput({
+        Name = "Size",
+        Placeholder = "None / Big",
+        Flag = "AppSize",
+        Callback = function(t) C.TargetSize = (t == "" and "None") or t end,
+    })
+    addD(f2, "Mutation", "AppMut", "None", D.MutationList, function(v) C.TargetMutation = v end)
+    addT(f2, "Auto Favorite", "AutoFav", false, function(v)
+        C.AutoFavorite = v
+        if v then SH.runAutoFavorite() end
+    end)
+    addT(f2, "Auto Sell Selected", "AutoSellSel", false, function(v)
+        C.AutoSellSelected = v
+        if v then SH.runAutoSellSelected() end
+    end)
+    addD(f2, "Rarity", "SellRar", "None", D.RarityList, function(v) C.SellSelectedRarity = v end)
+    f2:AddTextInput({
+        Name = "Name",
+        Placeholder = "None or fish name",
+        Flag = "SellName",
+        Callback = function(t) C.SellSelectedName = (t == "" and "None") or t end,
+    })
+
+    addT(f3, "Auto Enchant", "AutoEnch", false, function(v) C.AutoEnchant = v end)
+    local targetEnchantDrop
+    addD(f3, "Relic", "SelRelic", C.SelectedRelic, D.RelicNames, function(v)
+        C.SelectedRelic = v
+        local list = D.EnchantsData[v] or {}
+        C.TargetEnchant = list[1] or "Hasty"
+        if targetEnchantDrop and targetEnchantDrop.SetValues then
+            pcall(function() targetEnchantDrop:SetValues(list) end)
+        end
+    end)
+    targetEnchantDrop = addD(f3, "Enchant", "TgtEnch", C.TargetEnchant, D.EnchantsData[C.SelectedRelic], function(v)
+        C.TargetEnchant = v
+    end, true)
+    f3:AddParagraph({
+        Name = "Info",
+        Content = "Uses the Enchant Altar automatically.\nCosmic and Twisted use the second slot.",
+    })
+
+    -- ===== COLLECT =====
+    local ColTab = window:AddTab({ Name = "Collect", Icon = "lucide:package", Type = "Double" })
+    local c1 = ColTab:AddSection({ Name = "World", Position = "Left" })
+    local c2 = ColTab:AddSection({ Name = "Crab · Quests · Items", Position = "Right" })
+    local c3 = ColTab:AddSection({ Name = "Storage · Star Crater", Position = "Center" })
+
+    addT(c1, "Auto Cosmic Relic", "AutoCosmic", false, function(v)
+        C.AutoCosmicRelic = v
+        if v then SH.runAutoCosmicRelic() end
+    end)
+    addT(c1, "Auto Flowers", "AutoFlower", false, function(v)
+        C.AutoFlower = v
+        if v then SH.runAutoFlower() end
+    end)
+    addT(c1, "Auto Shell", "AutoShell", false, function(v)
+        C.AutoShell = v
+        if v then SH.runAutoShell() end
+    end)
+    addT(c1, "Auto Chests", "AutoChest", false, function(v)
+        C.AutoChest = v
+        if v then SH.runAutoChest() end
+    end)
+
+    addT(c2, "Place Crab Cage", "CrabDep", false, function(v)
+        C.AutoCrabDeploy = v
+        if v or C.AutoCrabClaim then SH.runCrabCage() end
+    end)
+    addT(c2, "Claim Crab Cage", "CrabClaim", false, function(v)
+        C.AutoCrabClaim = v
+        if v or C.AutoCrabDeploy then SH.runCrabCage() end
+    end)
+    addT(c2, "Auto Buy Merlin", "AutoMerlin", false, function(v)
+        C.AutoMerlin = v
+        if v then SH.runAutoMerlin() end
+    end)
+    addT(c2, "Auto Angler", "AutoAngler", false, function(v)
+        C.AutoAngler = v
+        if v then SH.runAutoAngler() end
+    end)
+    c2:AddTextInput({
+        Name = "Potion",
+        Placeholder = "None or tool name",
+        Flag = "PotName",
+        Callback = function(t) C.SelectedPotion = (t == "" and "None") or t end,
+    })
+    addT(c2, "Auto Use Potion", "AutoPot", false, function(v) C.AutoUsePotion = v end)
+    c2:AddTextInput({
+        Name = "Food",
+        Placeholder = "None or tool name",
+        Flag = "FoodName",
+        Callback = function(t) C.SelectedFood = (t == "" and "None") or t end,
+    })
+    addT(c2, "Auto Use Food", "AutoFood", false, function(v) C.AutoUseFood = v end)
+
+    local storageNameDrop
+    storageNameDrop = addD(c3, "Name", "StorName", "None", SH.getBackpackFishNames(), function(v)
+        S.StorageFilter.Name = v
+    end, true)
+    addD(c3, "Rarity", "StorRar", "None", D.RarityList, function(v)
+        S.StorageFilter.Rarity = v
+    end)
+    addD(c3, "Mutation", "StorMut", "None", D.MutationList, function(v)
+        S.StorageFilter.Mutation = v
+    end, true)
+    addB(c3, "Refresh Fish List", "lucide:refresh-cw", function()
+        if storageNameDrop and storageNameDrop.SetValues then
+            pcall(function() storageNameDrop:SetValues(SH.getBackpackFishNames()) end)
+        end
+    end)
+    addB(c3, "Run Storage", "lucide:box", function()
+        if S.StorageActive then
+            SH.notify("Storage", "Already running", 2)
+            return
+        end
+        S.StorageActive = true
+        task.spawn(function() SH.runStorage() end)
+        SH.notify("Storage", "Storage running...", 2)
+    end)
+    addB(c3, "Claim Star Craters", "lucide:star", function()
+        task.spawn(SH.runStarCrater)
+        SH.notify("Star Crater", "Claiming...", 2)
+    end)
+
+    -- ===== SHOP =====
+    local ShopTab = window:AddTab({ Name = "Shop", Icon = "lucide:shopping-cart", Type = "Double" })
+    local s1 = ShopTab:AddSection({ Name = "Rods · Crates", Position = "Left" })
+    local s2 = ShopTab:AddSection({ Name = "Items · UI", Position = "Right" })
+
+    addD(s1, "Rod", "SelRod", C.SelectedRod, D.RodList, function(v) C.SelectedRod = v end, true)
+    addB(s1, "Buy Rod", "lucide:shopping-bag", function()
+        local ev = SH.getEvents() and SH.getEvents():FindFirstChild("purchase")
+        if ev and C.SelectedRod then
+            pcall(function() ev:FireServer(C.SelectedRod, "Fish", nil, 1) end)
+            SH.notify("Shop", "Attempting to buy " .. C.SelectedRod, 3)
+        else
+            SH.notify("Shop", "Purchase remote or rod not found", 3)
+        end
+    end)
+    addD(s1, "Crate", "SelCrate", C.SelectedShopItem, D.CrateList, function(v) C.SelectedShopItem = v end)
+    s1:AddTextInput({
+        Name = "Amount",
+        Placeholder = "1",
+        Flag = "BuyAmt",
+        Callback = function(t) C.BuyItemAmount = tonumber(t) or 1 end,
+    })
+    addB(s1, "Buy Crate", "lucide:package", function()
+        local ev = SH.getEvents() and SH.getEvents():FindFirstChild("purchase")
+        if not ev then
+            SH.notify("Shop", "Purchase remote not found", 3)
+            return
+        end
+        local amount = C.BuyItemAmount or 1
+        for _ = 1, amount do
+            pcall(function() ev:FireServer(C.SelectedShopItem, "Fish", nil, 1) end)
+            if amount > 5 then task.wait(0.1) end
+        end
+        SH.notify("Shop", "Bought " .. amount .. "x " .. C.SelectedShopItem, 3)
+    end)
+
+    local selectedPurchaseItem = "Basic Diving Gear"
+    addD(s2, "Item", "SelItem", selectedPurchaseItem, D.PurchaseItemsList, function(v)
+        selectedPurchaseItem = v
+    end, true)
+    addB(s2, "Buy Item", "lucide:shopping-cart", function()
+        local ev = SH.getEvents() and SH.getEvents():FindFirstChild("purchase")
+        if ev then
+            pcall(function() ev:FireServer(selectedPurchaseItem, "Item", nil, 1) end)
+            SH.notify("Shop", "Bought " .. selectedPurchaseItem, 3)
+        else
+            SH.notify("Shop", "Purchase remote not found", 3)
+        end
+    end)
+    addB(s2, "Open Daily Shop", "lucide:store", function()
+        local daily = PlayerGui:FindFirstChild("hud") and PlayerGui.hud:FindFirstChild("safezone")
+            and PlayerGui.hud.safezone:FindFirstChild("DailyShop")
+        if daily then
+            daily.Visible = not daily.Visible
+        else
+            SH.notify("Shop", "Daily Shop UI not found", 2)
+        end
+    end)
+    addB(s2, "Open Black Market", "lucide:store", function()
+        local bm = PlayerGui:FindFirstChild("hud") and PlayerGui.hud:FindFirstChild("safezone")
+            and PlayerGui.hud.safezone:FindFirstChild("BlackMarket")
+        if bm then
+            bm.Visible = not bm.Visible
+        else
+            SH.notify("Shop", "Black Market UI not found", 2)
+        end
+    end)
+
+    -- ===== TELEPORT =====
+    local TPTab = window:AddTab({ Name = "Teleport", Icon = "lucide:map-pin", Type = "Double" })
+    local t1 = TPTab:AddSection({ Name = "Locations", Position = "Left" })
+    local t2 = TPTab:AddSection({ Name = "Players · Whirlpool", Position = "Right" })
+
+    addD(t1, "Location", "SelLoc", D.LocationNames[1], D.LocationNames, function(v)
+        C.SelectedLoc = D.Locations[v]
+    end, true)
+    addB(t1, "Teleport", "lucide:navigation", function()
+        if C.SelectedLoc then
+            SH.teleportTo(C.SelectedLoc)
+            SH.notify("Teleport", "Teleported", 2)
+        else
+            SH.notify("Teleport", "Select a location first", 2)
+        end
+    end)
+    addB(t1, "Safe Whirlpool", "lucide:waves", function()
+        local activeFolder = Workspace:FindFirstChild("active")
+        local target = activeFolder and activeFolder:FindFirstChild("Safe Whirlpool")
+        if not target then
+            SH.notify("Teleport", "Whirlpool is not active", 3)
+            return
+        end
+        local cf
+        if target:IsA("Model") then
+            cf = target.PrimaryPart and target.PrimaryPart.CFrame or target:GetPivot()
+        elseif target:IsA("BasePart") then
+            cf = target.CFrame
+        end
+        if cf then
+            SH.teleportTo(cf * CFrame.new(0, 5, 0))
+            SH.notify("Teleport", "Teleported to whirlpool", 2)
+        end
+    end)
+
+    local selectedPlayerName = ""
+    local function getPlayerList()
+        local list = {}
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then table.insert(list, plr.Name) end
+        end
+        table.sort(list)
+        if #list == 0 then table.insert(list, "No other players") end
+        return list
+    end
+    local playerDrop
+    playerDrop = t2:AddDropdown({
+        Name = "Player",
+        Default = "",
+        Values = getPlayerList(),
+        Search = true,
+        Flag = "TPPlr",
+        Callback = function(v) selectedPlayerName = v end,
+    })
+    addB(t2, "Refresh Players", "lucide:refresh-cw", function()
+        if playerDrop and playerDrop.SetValues then
+            pcall(function() playerDrop:SetValues(getPlayerList()) end)
+        end
+        SH.notify("Teleport", "Player list updated", 2)
+    end)
+    addB(t2, "Teleport to Player", "lucide:user", function()
+        local target = Players:FindFirstChild(selectedPlayerName)
+        if target and target.Character then
+            SH.teleportTo(target.Character:GetPivot())
+            SH.notify("Teleport", "Teleported to " .. selectedPlayerName, 2)
+        else
+            SH.notify("Teleport", "Player not found", 2)
+        end
+    end)
+
+    -- ===== UTILITIES =====
+    local UtilTab = window:AddTab({ Name = "Utilities", Icon = "lucide:zap", Type = "Double" })
+    local u1 = UtilTab:AddSection({ Name = "Movement", Position = "Left" })
+    local u2 = UtilTab:AddSection({ Name = "Visual · ESP", Position = "Right" })
+
+    addT(u1, "Fly", "Fly", false, function(v) SH.toggleFly(v) end)
+    addS(u1, "Speed", "FlySpd", 50, 10, 200, function(v) C.FlySpeed = v end)
+    addT(u1, "Noclip", "Noclip", false, function(v) SH.toggleNoclip(v) end)
+    addT(u1, "Infinite Jump", "InfJump", false, function(v) SH.toggleInfiniteJump(v) end)
+    addT(u1, "Walk Speed", "WS", false, function(v) SH.toggleWalkspeed(v) end)
+    addS(u1, "Walk", "WSVal", 20, 16, 150, function(v) C.WalkspeedValue = v end)
+    addT(u1, "Anti Swim / Oxygen", "AntiSwim", false, function(v) SH.toggleAntiSwim(v) end)
+
+    addT(u2, "Full Brightness", "FB", false, function(v) SH.toggleFullBright(v) end)
+    addT(u2, "Potato Mode", "Potato", false, function(v) SH.togglePotato(v) end)
+    addT(u2, "Player ESP", "PlrESP", false, function(v) SH.togglePlayerESP(v) end)
+    addT(u2, "NPC ESP", "NPCESP", false, function(v) SH.toggleNPCESP(v) end)
+
+    -- ===== PROTECTION =====
+    local ProtTab = window:AddTab({ Name = "Protection", Icon = "lucide:shield", Type = "Double" })
+    local p1 = ProtTab:AddSection({ Name = "Anti Staff · Bypass", Position = "Left" })
+    local p2 = ProtTab:AddSection({ Name = "Social · Avatar", Position = "Right" })
+
+    addT(p1, "Anti Staff", "AntiStaff", false, function(v) SH.toggleAntiStaff(v) end)
+    addT(p1, "Bypass GPS", "BypassGPS", false, function(v) SH.toggleBypassGPS(v) end)
+    addT(p1, "Hide Minigame UI", "HideMG", false, function(v) SH.toggleHideMinigame(v) end)
+
+    addT(p2, "Auto Friend", "AutoFr", false, function(v) SH.toggleAutoFriend(v) end)
+    addT(p2, "Censor Name", "CensorUN", false, function(v) SH.toggleCensor(v) end)
+    p2:AddTextInput({
+        Name = "User",
+        Placeholder = "Roblox username",
+        Flag = "AvaUser",
+        Callback = function(t) C.AvatarTarget = t or "" end,
+    })
+    addB(p2, "Apply Avatar", "lucide:user", function() SH.applyAvatar(C.AvatarTarget) end)
+
+    -- ===== WEBHOOK =====
+    local WhTab = window:AddTab({ Name = "Webhook", Icon = "lucide:bell", Type = "Double" })
+    local w1 = WhTab:AddSection({ Name = "Discord Webhook", Position = "Left" })
+    local w2 = WhTab:AddSection({ Name = "Settings", Position = "Right" })
+
+    addT(w1, "Enable Webhook", "WhEn", false, function(v) C.WebhookEnabled = v end)
+    w1:AddTextInput({
+        Name = "URL",
+        Placeholder = "discord.com/api/webhooks/...",
+        Flag = "WhURL",
+        Callback = function(t) C.WebhookURL = t or "" end,
+    })
+    w1:AddTextInput({
+        Name = "User ID",
+        Placeholder = "Optional, for mentions",
+        Flag = "WhID",
+        Callback = function(t) C.WebhookDiscordID = t or "" end,
+    })
+    addB(w1, "Send Test", "lucide:send", function() SH.testWebhook() end)
+    addS(w2, "Delay", "WhDel", 3, 1, 30, function(v) C.WebhookDelay = v end)
+    addT(w2, "Enable Mentions", "WhMen", false, function(v) C.WebhookMentions = v end)
+    w2:AddParagraph({
+        Name = "Setup",
+        Content = "1. Channel → Integrations → Webhooks\n2. New Webhook → Copy URL\n3. Paste, enable, then send a test",
+    })
+
+    -- ===== MISC =====
+    local MiscTab = window:AddTab({ Name = "Misc", Icon = "lucide:settings", Type = "Double" })
+    local m1 = MiscTab:AddSection({ Name = "Identity · Radar", Position = "Left" })
+    local m2 = MiscTab:AddSection({ Name = "Player · Performance", Position = "Right" })
+    local m3 = MiscTab:AddSection({ Name = "Server", Position = "Center" })
+
+    m1:AddTextInput({
+        Name = "Name",
+        Placeholder = "Player",
+        Flag = "CustName",
+        Callback = function(t) C.CustomName = t end,
+    })
+    m1:AddTextInput({
+        Name = "Level",
+        Placeholder = "Level: 999",
+        Flag = "CustLvl",
+        Callback = function(t) C.CustomLevel = t end,
+    })
+    addT(m1, "Hide Identity", "HideId", false, function(v) SH.toggleIdentity(v) end)
+    addT(m1, "Radar Bypass", "Radar", false, function(v) SH.toggleRadar(v) end)
+
+    addT(m2, "Walk on Water", "WOW", false, function(v) SH.toggleWalkOnWater(v) end)
+    addT(m2, "Anti AFK", "AntiAFK", true, function(v) SH.toggleAntiAFK(v) end)
+    addT(m2, "Freeze Character", "Freeze", false, function(v) SH.toggleFreeze(v) end)
+    addT(m2, "FPS Boost", "FPS", false, function(v) SH.toggleFPS(v) end)
+    addT(m2, "Black Screen (AFK)", "BlackScr", false, function(v) SH.toggleBlackScreen(v) end)
+    addT(m2, "White Screen (AFK)", "WhiteScr", false, function(v) SH.toggleWhiteScreen(v) end)
+
+    m3:AddParagraph({
+        Name = "Server Status",
+        Content = "JobId: " .. tostring(game.JobId)
+            .. "\nPlayers: " .. #Players:GetPlayers() .. " / " .. Players.MaxPlayers
+            .. "\nPlaceId: " .. tostring(game.PlaceId),
+    })
+    addB(m3, "Refresh Status", "lucide:refresh-cw", function()
+        SH.notify("Server", "Players: " .. #Players:GetPlayers() .. " / " .. Players.MaxPlayers, 4)
+    end)
+    addB(m3, "Copy JobId", "lucide:copy", function() SH.copyJobId() end)
+    addB(m3, "Copy PlaceId", "lucide:copy", function() SH.copyPlaceId() end)
+    m3:AddTextInput({
+        Name = "JobId",
+        Placeholder = "Private server JobId",
+        Flag = "PrivJob",
+        Callback = function(t) C.PrivateServerJobId = t or "" end,
+    })
+    addB(m3, "Join JobId", "lucide:log-in", function() SH.joinJobId(C.PrivateServerJobId) end)
+    addB(m3, "Rejoin Server", "lucide:rotate-cw", function() SH.rejoinSameServer() end)
+    addB(m3, "Rejoin Any Server", "lucide:refresh-cw", function()
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end)
+    addB(m3, "Server Hop", "lucide:server", function() SH.serverHop() end)
+    m3:AddParagraph({
+        Name = "Info",
+        Content = "SolanaHub · Fisch\ndiscord.gg/solanahub",
+    })
+
+    task.spawn(function()
+        while task.wait(15) do
+            pcall(function() SH.refreshEventText(false) end)
+        end
+    end)
+
+    SH.notify("SolanaHub", "Loaded successfully", 3)
+end
+
+-- =====================================================
+-- BOOTSTRAP
+-- =====================================================
+local function safeRun(label, fn)
+    local ok, err = pcall(fn)
+    if not ok then warn("[SolanaHub] " .. label .. " failed: " .. tostring(err)) end
+end
+
+local okUI, uiErr = xpcall(SH.buildUI, function(err)
+    return debug.traceback(tostring(err))
+end)
+if not okUI then
+    warn("[SolanaHub] UI build error: " .. tostring(uiErr))
+end
+
+safeRun("Connections", SH.startConnections)
+safeRun("HookReel", SH.hookReel)
+safeRun("AutoCast", SH.autoCastLoop)
+safeRun("AutoShake", SH.startAutoShake)
+safeRun("AutoEquip", SH.startAutoEquip)
+safeRun("InstantBobber", SH.startInstantBobber)
+safeRun("AutoEnchant", SH.startAutoEnchant)
+safeRun("Consumables", SH.startConsumables)
+safeRun("AntiAFK", function() SH.toggleAntiAFK(true) end)
+safeRun("EventRefresh", function()
+    task.spawn(function()
+        while task.wait(15) do
+            pcall(function() SH.refreshEventText(false) end)
+        end
+    end)
+end)
